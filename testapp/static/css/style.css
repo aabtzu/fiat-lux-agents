@@ -89,6 +89,12 @@ pre {
 .empty { color: #999; font-size: 13px; font-style: italic; }
 .loading { color: #888; font-size: 12px; }
 
+/* Chart */
+.chart-container {
+  background: #fff; border: 1px solid #ddd; border-radius: 6px;
+  padding: 16px; margin-top: 12px;
+}
+
 /* Scope toggle — reusable "all vs filtered" pattern */
 .scope-toggle { display: inline-flex; border: 1px solid #ddd; border-radius: 4px; overflow: hidden; }
 .scope-toggle button {

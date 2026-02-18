@@ -1,6 +1,7 @@
 // --- State ---
 let showFilteredOut = false;
 let queryScope = 'filtered'; // 'filtered' | 'all'
+let queryChart = null;
 
 // --- Tab switching ---
 document.querySelectorAll('.tab').forEach(tab => {
@@ -128,6 +129,58 @@ async function clearFilters() {
   applyState(await res.json());
 }
 
+// --- Chart rendering ---
+const CHART_COLORS = [
+  '#1a1a2e', '#4a90d9', '#e85d5d', '#50b86c', '#f0a500',
+  '#9b59b6', '#2ecc71', '#e74c3c', '#3498db', '#f39c12'
+];
+
+function renderChart(vizConfig, columns, data) {
+  const container = document.getElementById('query-chart-container');
+  const type = vizConfig?.type;
+
+  if (!type || type === 'none' || !data?.length || !columns?.length) {
+    container.style.display = 'none';
+    if (queryChart) { queryChart.destroy(); queryChart = null; }
+    return;
+  }
+
+  container.style.display = 'block';
+  if (queryChart) { queryChart.destroy(); queryChart = null; }
+
+  const xCol = columns[0];
+  const yCols = columns.slice(1); // support multiple value columns
+
+  const labels = data.map(r => String(r[xCol]));
+
+  const datasets = yCols.map((col, i) => ({
+    label: col,
+    data: type === 'scatter'
+      ? data.map(r => ({ x: r[xCol], y: r[col] }))
+      : data.map(r => r[col]),
+    backgroundColor: CHART_COLORS[i % CHART_COLORS.length] + (type === 'line' ? '33' : 'cc'),
+    borderColor: CHART_COLORS[i % CHART_COLORS.length],
+    borderWidth: type === 'line' ? 2 : 1,
+    fill: false,
+    tension: 0.3,
+    pointRadius: type === 'scatter' ? 5 : 3,
+  }));
+
+  const options = {
+    responsive: true,
+    plugins: {
+      legend: { display: datasets.length > 1 }
+    },
+    scales: vizConfig.scales || {}
+  };
+
+  queryChart = new Chart(document.getElementById('query-chart'), {
+    type: type === 'scatter' ? 'scatter' : type,
+    data: type === 'scatter' ? { datasets } : { labels, datasets },
+    options
+  });
+}
+
 // --- Query scope toggle ---
 function setQueryScope(scope) {
   queryScope = scope;
@@ -165,6 +218,10 @@ async function sendQuery() {
   document.getElementById('query-result').textContent = d.result
     ? JSON.stringify(d.result.data, null, 2).slice(0, 800)
     : d.error || '';
+
+  if (d.result?.success) {
+    renderChart(d.visualization, d.result.columns, d.result.data);
+  }
 }
 
 async function clearQueryHistory() {
@@ -173,6 +230,7 @@ async function clearQueryHistory() {
     '<div class="msg assistant">Ask a question about the data.</div>';
   document.getElementById('query-code').textContent   = 'None yet';
   document.getElementById('query-result').textContent = 'None yet';
+  renderChart(null, null, null);
 }
 
 // --- Filter Chat ---
