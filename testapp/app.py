@@ -30,6 +30,18 @@ filter_chat_bot = FilterChatBot(
 )
 
 
+def _data_state():
+    """Return all rows annotated with _visible, plus filter state. Used by all filter routes."""
+    filtered = filter_engine.apply(SAMPLE_DATA)
+    filtered_ids = {row['id'] for row in filtered}
+    return {
+        'data': [{**row, '_visible': row['id'] in filtered_ids} for row in SAMPLE_DATA],
+        'total': len(SAMPLE_DATA),
+        'filtered': len(filtered),
+        'filters': filter_engine.get_active_filters()
+    }
+
+
 # --- Pages ---
 
 @app.route('/')
@@ -41,13 +53,7 @@ def index():
 
 @app.route('/api/data')
 def get_data():
-    filtered = filter_engine.apply(SAMPLE_DATA)
-    return jsonify({
-        'data': filtered,
-        'total': len(SAMPLE_DATA),
-        'filtered': len(filtered),
-        'filters': filter_engine.get_active_filters()
-    })
+    return jsonify(_data_state())
 
 
 # --- Filter tab ---
@@ -58,8 +64,7 @@ def add_filter():
     if not message:
         return jsonify({'error': 'No message provided'}), 400
 
-    existing = filter_engine.get_active_filters()
-    spec = filter_bot.interpret_filter(message, existing)
+    spec = filter_bot.interpret_filter(message, filter_engine.get_active_filters())
 
     if spec.get('error'):
         return jsonify({'error': spec['error']}), 400
@@ -68,30 +73,28 @@ def add_filter():
     if not is_valid:
         return jsonify({'error': err}), 400
 
-    filter_id = filter_engine.add_filter(spec)
-    filtered = filter_engine.apply(SAMPLE_DATA)
+    filter_engine.add_filter(spec)
+    state = _data_state()
+    state['description'] = spec['description']
+    return jsonify(state)
 
-    return jsonify({
-        'filter_id': filter_id,
-        'description': spec['description'],
-        'filters': filter_engine.get_active_filters(),
-        'data': filtered,
-        'count': len(filtered)
-    })
+
+@app.route('/api/filter/toggle', methods=['POST'])
+def toggle_filter():
+    filter_engine.toggle_filter(request.json.get('filter_id'))
+    return jsonify(_data_state())
 
 
 @app.route('/api/filter/remove', methods=['POST'])
 def remove_filter():
-    filter_id = request.json.get('filter_id')
-    filter_engine.remove_filter(filter_id)
-    filtered = filter_engine.apply(SAMPLE_DATA)
-    return jsonify({'filters': filter_engine.get_active_filters(), 'data': filtered, 'count': len(filtered)})
+    filter_engine.remove_filter(request.json.get('filter_id'))
+    return jsonify(_data_state())
 
 
 @app.route('/api/filter/clear', methods=['POST'])
 def clear_filters():
     filter_engine.clear_filters()
-    return jsonify({'filters': [], 'data': SAMPLE_DATA, 'count': len(SAMPLE_DATA)})
+    return jsonify(_data_state())
 
 
 # --- Query tab ---
@@ -102,11 +105,9 @@ def run_query():
     if not message:
         return jsonify({'error': 'No message provided'}), 400
 
-    # Get filtered data as DataFrame
     filtered = filter_engine.apply(SAMPLE_DATA)
     df = pd.DataFrame(filtered)
 
-    # Ask ChatBot to generate query + visualization config
     result = chat_bot.process_query(message, chat_history, {**SUMMARY, 'filtered_rows': len(filtered)})
 
     if not result['success']:
@@ -114,21 +115,15 @@ def run_query():
 
     response = result['response']
     query_code = response.get('query', '')
-    viz = response.get('visualization', {})
+    query_result = execute_query(query_code, df) if query_code else {'success': True, 'data': []}
 
-    # Execute the generated query
-    query_result = {'success': True, 'data': [], 'columns': []}
-    if query_code:
-        query_result = execute_query(query_code, df)
-
-    # Append to history
     chat_history.append({'role': 'user', 'content': message})
     chat_history.append({'role': 'assistant', 'content': response.get('answer', '')})
 
     return jsonify({
         'answer': response.get('answer', ''),
         'query': query_code,
-        'visualization': viz,
+        'visualization': response.get('visualization', {}),
         'result': query_result,
         'metadata': response.get('metadata', {})
     })
@@ -163,18 +158,16 @@ def filter_chat():
     result = {'intent': intent}
 
     if intent == 'filter' and filter_spec and not filter_spec.get('error'):
-        filter_id = filter_engine.add_filter(filter_spec)
-        filtered = filter_engine.apply(SAMPLE_DATA)
+        filter_engine.add_filter(filter_spec)
+        state = _data_state()
         result.update({
-            'response': f"Filter added: {filter_spec['description']}. {len(filtered)} items remaining.",
+            'response': f"Filter added: {filter_spec['description']}. {state['filtered']} items remaining.",
             'filter_spec': filter_spec,
-            'filters': filter_engine.get_active_filters(),
-            'data': filtered,
-            'count': len(filtered)
+            **state
         })
         filter_chat_history.append({'role': 'assistant', 'content': result['response']})
     else:
-        result['response'] = response_text or filter_spec.get('error', 'Something went wrong.')
+        result['response'] = response_text or (filter_spec or {}).get('error', 'Something went wrong.')
         filter_chat_history.append({'role': 'assistant', 'content': result['response']})
 
     return jsonify(result)

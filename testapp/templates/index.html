@@ -3,64 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <title>fiat-lux-agents test app</title>
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: system-ui, sans-serif; background: #f5f5f5; color: #222; }
-
-    header { background: #1a1a2e; color: #fff; padding: 16px 24px; }
-    header h1 { font-size: 18px; font-weight: 600; }
-    header p  { font-size: 12px; color: #aaa; margin-top: 2px; }
-
-    .tabs { display: flex; background: #fff; border-bottom: 1px solid #ddd; padding: 0 24px; }
-    .tab  { padding: 12px 20px; cursor: pointer; font-size: 14px; color: #666; border-bottom: 2px solid transparent; }
-    .tab.active { color: #1a1a2e; border-bottom-color: #1a1a2e; font-weight: 600; }
-
-    .panel { display: none; padding: 24px; max-width: 1100px; margin: 0 auto; }
-    .panel.active { display: block; }
-
-    /* Data table */
-    .stats-bar { display: flex; gap: 16px; margin-bottom: 16px; font-size: 13px; color: #555; }
-    .stats-bar span { background: #fff; border: 1px solid #ddd; padding: 4px 10px; border-radius: 4px; }
-    table { width: 100%; border-collapse: collapse; background: #fff; font-size: 13px; }
-    th { background: #1a1a2e; color: #fff; padding: 8px 12px; text-align: left; }
-    td { padding: 7px 12px; border-bottom: 1px solid #eee; }
-    tr:hover td { background: #f9f9f9; }
-
-    /* Filter panel */
-    .filter-layout { display: grid; grid-template-columns: 1fr 340px; gap: 20px; }
-    .active-filters { margin-bottom: 16px; }
-    .filter-tag { display: inline-flex; align-items: center; gap: 6px; background: #e8f0fe; color: #1a1a2e;
-                  border: 1px solid #c5d8ff; border-radius: 4px; padding: 4px 10px; font-size: 12px; margin: 3px; }
-    .filter-tag button { background: none; border: none; cursor: pointer; color: #888; font-size: 14px; line-height: 1; }
-
-    /* Query / Chat panel */
-    .chat-layout { display: grid; grid-template-columns: 1fr 340px; gap: 20px; }
-    .messages { background: #fff; border: 1px solid #ddd; border-radius: 6px; padding: 16px;
-                height: 420px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
-    .msg { max-width: 85%; padding: 8px 12px; border-radius: 6px; font-size: 13px; line-height: 1.5; }
-    .msg.user { background: #1a1a2e; color: #fff; align-self: flex-end; }
-    .msg.assistant { background: #f0f0f0; align-self: flex-start; }
-
-    .input-row { display: flex; gap: 8px; margin-top: 10px; }
-    .input-row input { flex: 1; padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px; font-size: 13px; }
-    .input-row button { padding: 8px 16px; background: #1a1a2e; color: #fff; border: none;
-                        border-radius: 4px; cursor: pointer; font-size: 13px; }
-    .input-row button:hover { background: #2d2d50; }
-
-    .sidebar-card { background: #fff; border: 1px solid #ddd; border-radius: 6px; padding: 16px; }
-    .sidebar-card h3 { font-size: 13px; font-weight: 600; margin-bottom: 10px; color: #444; }
-    pre { font-size: 11px; background: #f5f5f5; padding: 10px; border-radius: 4px;
-          overflow-x: auto; white-space: pre-wrap; word-break: break-word; margin-top: 8px; }
-
-    .btn-sm { padding: 5px 10px; font-size: 12px; background: #eee; border: 1px solid #ccc;
-              border-radius: 4px; cursor: pointer; }
-    .btn-sm:hover { background: #ddd; }
-    .btn-danger { background: #fee; border-color: #fcc; color: #c00; }
-    .btn-danger:hover { background: #fcc; }
-
-    .empty { color: #999; font-size: 13px; font-style: italic; }
-    .loading { color: #888; font-size: 12px; }
-  </style>
+  <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
 
@@ -78,10 +21,13 @@
 
 <!-- DATA TAB -->
 <div class="panel active" id="tab-data">
-  <div class="stats-bar">
-    <span id="stat-total">Total: —</span>
-    <span id="stat-filtered">Showing: —</span>
-    <span id="stat-filters">Filters: 0</span>
+  <div class="table-toolbar">
+    <div class="stats-bar" style="margin:0">
+      <span id="stat-total">Total: —</span>
+      <span id="stat-filtered">Showing: —</span>
+      <span id="stat-filters">Filters: 0</span>
+    </div>
+    <button id="btn-show-filtered" class="btn-toggle-visibility" onclick="toggleShowFiltered()">Show filtered out</button>
   </div>
   <table id="data-table">
     <thead><tr>
@@ -96,8 +42,11 @@
 <div class="panel" id="tab-filter">
   <div class="filter-layout">
     <div>
-      <div class="active-filters" id="filter-tags">
-        <span class="empty">No active filters</span>
+      <div class="table-toolbar">
+        <div class="active-filters" id="filter-tags" style="margin:0;flex:1">
+          <span class="empty">No active filters</span>
+        </div>
+        <button id="btn-show-filtered-filter" class="btn-toggle-visibility" onclick="toggleShowFiltered()">Show filtered out</button>
       </div>
       <table id="filter-table">
         <thead><tr>
@@ -188,189 +137,6 @@
   </div>
 </div>
 
-<script>
-// --- Tab switching ---
-document.querySelectorAll('.tab').forEach(tab => {
-  tab.addEventListener('click', () => {
-    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
-    tab.classList.add('active');
-    document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
-    if (tab.dataset.tab === 'data' || tab.dataset.tab === 'filter') loadData();
-  });
-});
-
-// --- Data loading ---
-async function loadData() {
-  const res = await fetch('/api/data');
-  const d = await res.json();
-  renderTable('data-table', d.data);
-  renderTable('filter-table', d.data);
-  document.getElementById('stat-total').textContent = `Total: ${d.total}`;
-  document.getElementById('stat-filtered').textContent = `Showing: ${d.filtered}`;
-  document.getElementById('stat-filters').textContent = `Filters: ${d.filters.length}`;
-  renderFilterTags(d.filters);
-}
-
-function renderTable(id, rows) {
-  const tbody = document.querySelector(`#${id} tbody`);
-  if (!rows.length) { tbody.innerHTML = '<tr><td colspan="7" class="empty" style="padding:16px">No data</td></tr>'; return; }
-  tbody.innerHTML = rows.map(r => `<tr>
-    <td>${r.name}</td><td>${r.region}</td><td>${r.category}</td>
-    <td>${r.status}</td><td>$${r.amount.toLocaleString()}</td><td>${r.units}</td><td>${r.month}</td>
-  </tr>`).join('');
-}
-
-function renderFilterTags(filters) {
-  const el = document.getElementById('filter-tags');
-  if (!filters.length) { el.innerHTML = '<span class="empty">No active filters</span>'; return; }
-  el.innerHTML = filters.map(f => `
-    <span class="filter-tag">
-      ${f.description}
-      <button onclick="removeFilter('${f.id}')" title="Remove">×</button>
-    </span>`).join('');
-}
-
-// --- Filter ---
-function setFilter(text) { document.getElementById('filter-input').value = text; }
-
-async function addFilter() {
-  const input = document.getElementById('filter-input');
-  const status = document.getElementById('filter-status');
-  const message = input.value.trim();
-  if (!message) return;
-
-  status.textContent = 'Interpreting filter…';
-  const res = await fetch('/api/filter/add', {
-    method: 'POST', headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({message})
-  });
-  const d = await res.json();
-  if (d.error) { status.textContent = '❌ ' + d.error; return; }
-
-  input.value = '';
-  status.textContent = `✓ ${d.description}`;
-  renderTable('filter-table', d.data);
-  renderFilterTags(d.filters);
-  loadData();
-}
-
-async function removeFilter(id) {
-  const res = await fetch('/api/filter/remove', {
-    method: 'POST', headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({filter_id: id})
-  });
-  const d = await res.json();
-  renderTable('filter-table', d.data);
-  renderFilterTags(d.filters);
-  loadData();
-}
-
-async function clearFilters() {
-  const res = await fetch('/api/filter/clear', {method: 'POST'});
-  const d = await res.json();
-  renderTable('filter-table', d.data);
-  renderFilterTags(d.filters);
-  document.getElementById('filter-status').textContent = '';
-  loadData();
-}
-
-// --- Query ---
-async function sendQuery() {
-  const input = document.getElementById('query-input');
-  const message = input.value.trim();
-  if (!message) return;
-
-  addMessage('query-messages', 'user', message);
-  addMessage('query-messages', 'assistant', '…');
-  input.value = '';
-
-  const res = await fetch('/api/query', {
-    method: 'POST', headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({message})
-  });
-  const d = await res.json();
-
-  // Replace the "…" with the actual answer
-  const msgs = document.getElementById('query-messages');
-  msgs.lastChild.textContent = d.error || d.answer;
-
-  document.getElementById('query-code').textContent = d.query || 'No query generated';
-  document.getElementById('query-result').textContent = d.result
-    ? JSON.stringify(d.result.data, null, 2).slice(0, 800)
-    : d.error || '';
-}
-
-async function clearQueryHistory() {
-  await fetch('/api/query/clear', {method: 'POST'});
-  const msgs = document.getElementById('query-messages');
-  msgs.innerHTML = '<div class="msg assistant">Ask a question about the data.</div>';
-  document.getElementById('query-code').textContent = 'None yet';
-  document.getElementById('query-result').textContent = 'None yet';
-}
-
-// --- Filter Chat ---
-async function sendFilterChat() {
-  const input = document.getElementById('filterchat-input');
-  const message = input.value.trim();
-  if (!message) return;
-
-  addMessage('filterchat-messages', 'user', message);
-  addMessage('filterchat-messages', 'assistant', '…');
-  input.value = '';
-
-  const res = await fetch('/api/filterchat', {
-    method: 'POST', headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({message})
-  });
-  const d = await res.json();
-
-  const msgs = document.getElementById('filterchat-messages');
-  msgs.lastChild.textContent = d.response || d.error;
-
-  if (d.filters) {
-    const tags = document.getElementById('filterchat-tags');
-    if (!d.filters.length) { tags.innerHTML = '<span class="empty">None</span>'; }
-    else { tags.innerHTML = d.filters.map(f => `<div style="font-size:12px;margin:2px 0">• ${f.description}</div>`).join(''); }
-  }
-
-  if (d.data) {
-    document.getElementById('filterchat-result').textContent =
-      `${d.count} items\n` + JSON.stringify(d.data.slice(0, 5), null, 2).slice(0, 600);
-  }
-}
-
-async function clearFilterChat() {
-  await fetch('/api/filterchat/clear', {method: 'POST'});
-  const msgs = document.getElementById('filterchat-messages');
-  msgs.innerHTML = '<div class="msg assistant">Ask questions or request filters.</div>';
-  document.getElementById('filterchat-tags').innerHTML = '<span class="empty">None</span>';
-  document.getElementById('filterchat-result').textContent = 'None yet';
-}
-
-// --- Helpers ---
-function addMessage(containerId, role, text) {
-  const el = document.createElement('div');
-  el.className = `msg ${role}`;
-  el.textContent = text;
-  const container = document.getElementById(containerId);
-  container.appendChild(el);
-  container.scrollTop = container.scrollHeight;
-}
-
-// Enter key support
-['filter-input', 'query-input', 'filterchat-input'].forEach(id => {
-  document.getElementById(id).addEventListener('keydown', e => {
-    if (e.key === 'Enter') {
-      if (id === 'filter-input') addFilter();
-      if (id === 'query-input') sendQuery();
-      if (id === 'filterchat-input') sendFilterChat();
-    }
-  });
-});
-
-// Initial load
-loadData();
-</script>
+<script src="/static/js/app.js"></script>
 </body>
 </html>
