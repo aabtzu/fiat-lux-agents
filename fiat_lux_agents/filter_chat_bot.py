@@ -1,6 +1,6 @@
 """
-FilterChatBot - conversational agent that handles both data questions and filter creation
-in the same chat thread. Delegates filter creation to FilterBot.
+FilterChatBot - conversational agent that handles data questions, filter creation,
+and filter clearing in the same chat thread.
 """
 
 import json
@@ -12,11 +12,10 @@ from .filter_bot import FilterBot
 
 class FilterChatBot(LLMBaseAgent):
     """
-    Handles mixed conversations where the user might ask data questions
-    or request filters in the same thread.
+    Handles mixed conversations where the user might ask data questions,
+    request filters, or clear filters in the same thread.
 
-    Determines intent (question vs filter), then either answers the question
-    directly or delegates to FilterBot to create a filter spec.
+    Returns intent as one of: 'question', 'filter', 'clear'
 
     Usage:
         bot = FilterChatBot(
@@ -26,12 +25,6 @@ class FilterChatBot(LLMBaseAgent):
     """
 
     def __init__(self, dataset_description: str = None, model=DEFAULT_MODEL):
-        """
-        Args:
-            dataset_description: Plain-text description of the dataset for the system prompt.
-                e.g. "56 horses with measurements: VL (viral load), Platelets, Temp, DPI"
-            model: Claude model to use
-        """
         super().__init__(model=model, max_tokens=2000)
         self.filter_bot = FilterBot(model=model)
         self._dataset_description = dataset_description or "A tabular dataset with multiple fields per item."
@@ -42,41 +35,76 @@ class FilterChatBot(LLMBaseAgent):
 
 Dataset: {self._dataset_description}
 
-You can do two things:
-1. Answer questions about the data (statistics, counts, patterns, comparisons)
-2. Create filters based on user requests
-
-Determine if the user is asking a QUESTION or requesting a FILTER.
+You can do three things:
+1. Answer questions about the data (statistics, counts, breakdowns, summaries)
+2. Create filters to narrow down which rows are visible
+3. Clear all active filters
 
 CRITICAL: Return ONLY valid JSON. No markdown, no explanations.
 
 Return format:
 {{
-  "intent": "question" | "filter",
-  "response": "your answer (only for simple questions that don't need data)",
+  "intent": "question" | "filter" | "clear",
+  "response": "your answer (only for questions that don't need data lookup)",
   "filter_query": "reformulated filter query (only for filter intent)",
   "needs_data": true | false
 }}
+
+INTENT RULES — read carefully:
+
+"question" — user wants information, a count, a breakdown, or to SEE data grouped/ranked:
+  - "how many completed sales?"
+  - "what is the average amount?"
+  - "show sales by month"            ← QUESTION (wants to see grouped data)
+  - "show me the top 5 by amount"    ← QUESTION (wants to see ranked data)
+  - "what does X mean?"
+
+"filter" — user wants to NARROW DOWN which rows are visible:
+  - "filter to only completed items"
+  - "only show Electronics"
+  - "exclude cancelled orders"
+  - "keep only rows where amount > 500"
+  - "remove the West region"
+
+"clear" — user wants to remove all active filters:
+  - "clear filters"
+  - "reset filters"
+  - "show all data"
+  - "remove all filters"
+  - "start over"
+
+KEY DISTINCTION: "show X by Y" or "show me X" = QUESTION. "show only X" or "filter to X" = FILTER.
 
 Examples:
 
 "how many items are there?" →
 {{"intent": "question", "response": null, "needs_data": true}}
 
+"show sales by month" →
+{{"intent": "question", "response": null, "needs_data": true}}
+
+"what is the total amount by category?" →
+{{"intent": "question", "response": null, "needs_data": true}}
+
 "filter to only completed items" →
 {{"intent": "filter", "filter_query": "only completed items"}}
 
-"show items above the average" →
-{{"intent": "filter", "filter_query": "items with value above average"}}
+"only show Electronics" →
+{{"intent": "filter", "filter_query": "only Electronics category"}}
 
-"what does DPI stand for?" →
-{{"intent": "question", "response": "DPI stands for Days Post Infection.", "needs_data": false}}
+"exclude cancelled" →
+{{"intent": "filter", "filter_query": "exclude cancelled status"}}
+
+"clear filters" →
+{{"intent": "clear"}}
+
+"show all data" →
+{{"intent": "clear"}}
 
 Guidelines:
-- Be conversational and remember context from prior messages
-- When creating filters that reference prior answers (e.g. "above that threshold"),
-  substitute the actual value from context into filter_query
-- If unclear, ask for clarification"""
+- Be conversational and remember context from previous messages
+- When a filter references a prior answer (e.g. "above that average"), substitute the actual value
+- If genuinely unclear between question and filter, ask for clarification"""
 
     def process_message(
         self,
@@ -87,16 +115,11 @@ Guidelines:
         """
         Process a conversational message.
 
-        Args:
-            user_message: The user's message
-            conversation_history: Prior {"role", "content"} messages
-            data: The dataset dict (structure depends on the app)
-
         Returns:
             (intent, response_text, filter_spec)
-            - intent: "question" or "filter"
-            - response_text: Answer string (for questions), or None (for filters)
-            - filter_spec: Filter spec dict (for filters), or None (for questions)
+            - intent: 'question', 'filter', or 'clear'
+            - response_text: Answer string (for questions), or None
+            - filter_spec: Filter spec dict (for filters), or None
         """
         context = "\n".join([
             f"{msg['role']}: {msg['content']}"
@@ -115,14 +138,15 @@ Guidelines:
 
             if intent == 'filter':
                 filter_query = intent_data.get('filter_query', user_message)
-                # Substitute median/threshold values from context if referenced
                 if 'median' in filter_query.lower():
                     match = re.search(r'median.*?(\d+(?:\.\d+)?(?:e[+-]?\d+)?)', context, re.IGNORECASE)
                     if match:
                         filter_query = filter_query.replace('median', match.group(1))
-
                 filter_spec = self.filter_bot.interpret_filter(filter_query, [])
                 return 'filter', None, filter_spec
+
+            elif intent == 'clear':
+                return 'clear', None, None
 
             elif intent == 'question':
                 if intent_data.get('needs_data'):

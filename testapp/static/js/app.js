@@ -252,7 +252,7 @@ async function sendFilterChat() {
 
   setMessageText(document.getElementById('filterchat-messages').lastChild, d.response || d.error, 'assistant');
 
-  if (d.filters) {
+  if (d.filters !== undefined) {
     const tags = document.getElementById('filterchat-tags');
     tags.innerHTML = d.filters.length
       ? d.filters.map(f => `<div style="font-size:12px;margin:2px 0">• ${f.description}</div>`).join('')
@@ -260,9 +260,20 @@ async function sendFilterChat() {
   }
 
   if (d.data) {
+    applyState(d);
     document.getElementById('filterchat-result').textContent =
       `${d.filtered} items\n` + JSON.stringify(d.data.filter(r => r._visible).slice(0, 5), null, 2).slice(0, 600);
   }
+}
+
+async function clearFiltersFromChat() {
+  const res = await fetch('/api/filter/clear', { method: 'POST' });
+  const d = await res.json();
+  applyState(d);
+  const tags = document.getElementById('filterchat-tags');
+  tags.innerHTML = '<span class="empty">None</span>';
+  document.getElementById('filterchat-result').textContent = 'None yet';
+  addMessage('filterchat-messages', 'assistant', 'All filters cleared.');
 }
 
 async function clearFilterChat() {

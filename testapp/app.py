@@ -169,6 +169,13 @@ def filter_chat():
             **state
         })
         filter_chat_history.append({'role': 'assistant', 'content': result['response']})
+
+    elif intent == 'clear':
+        filter_engine.clear_filters()
+        state = _data_state()
+        result.update({'response': 'All filters cleared.', **state})
+        filter_chat_history.append({'role': 'assistant', 'content': 'All filters cleared.'})
+
     else:
         result['response'] = response_text or (filter_spec or {}).get('error', 'Something went wrong.')
         filter_chat_history.append({'role': 'assistant', 'content': result['response']})
