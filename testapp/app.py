@@ -105,10 +105,11 @@ def run_query():
     if not message:
         return jsonify({'error': 'No message provided'}), 400
 
-    filtered = filter_engine.apply(SAMPLE_DATA)
-    df = pd.DataFrame(filtered)
+    scope = request.json.get('scope', 'filtered')  # 'filtered' | 'all'
+    rows = filter_engine.apply(SAMPLE_DATA) if scope == 'filtered' else SAMPLE_DATA
+    df = pd.DataFrame(rows)
 
-    result = chat_bot.process_query(message, chat_history, {**SUMMARY, 'filtered_rows': len(filtered)})
+    result = chat_bot.process_query(message, chat_history, {**SUMMARY, 'row_count': len(rows), 'scope': scope})
 
     if not result['success']:
         return jsonify({'error': result['error']}), 500
@@ -125,7 +126,9 @@ def run_query():
         'query': query_code,
         'visualization': response.get('visualization', {}),
         'result': query_result,
-        'metadata': response.get('metadata', {})
+        'metadata': response.get('metadata', {}),
+        'scope': scope,
+        'row_count': len(rows)
     })
 
 

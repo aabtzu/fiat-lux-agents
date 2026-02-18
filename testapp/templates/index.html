@@ -85,6 +85,13 @@
 <div class="panel" id="tab-query">
   <div class="chat-layout">
     <div>
+      <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
+        <div class="scope-toggle">
+          <button class="query-scope-btn active" data-scope="filtered" onclick="setQueryScope('filtered')">Filtered</button>
+          <button class="query-scope-btn" data-scope="all" onclick="setQueryScope('all')">All data</button>
+        </div>
+        <span class="scope-label" id="query-scope-label">(filtered rows)</span>
+      </div>
       <div class="messages" id="query-messages">
         <div class="msg assistant">Ask a question about the data. I'll generate a pandas query and show the results.</div>
       </div>

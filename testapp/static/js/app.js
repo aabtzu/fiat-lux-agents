@@ -1,5 +1,6 @@
 // --- State ---
 let showFilteredOut = false;
+let queryScope = 'filtered'; // 'filtered' | 'all'
 
 // --- Tab switching ---
 document.querySelectorAll('.tab').forEach(tab => {
@@ -127,6 +128,21 @@ async function clearFilters() {
   applyState(await res.json());
 }
 
+// --- Query scope toggle ---
+function setQueryScope(scope) {
+  queryScope = scope;
+  document.querySelectorAll('.query-scope-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.scope === scope);
+  });
+  updateScopeLabel();
+}
+
+function updateScopeLabel() {
+  const el = document.getElementById('query-scope-label');
+  if (!el) return;
+  el.textContent = queryScope === 'filtered' ? '(filtered rows)' : '(all rows)';
+}
+
 // --- Query ---
 async function sendQuery() {
   const input = document.getElementById('query-input');
@@ -140,7 +156,7 @@ async function sendQuery() {
   const res = await fetch('/api/query', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ message })
+    body: JSON.stringify({ message, scope: queryScope })
   });
   const d = await res.json();
 
