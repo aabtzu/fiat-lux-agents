@@ -213,7 +213,7 @@ async function sendQuery() {
   });
   const d = await res.json();
 
-  document.getElementById('query-messages').lastChild.textContent = d.error || d.answer;
+  setMessageText(document.getElementById('query-messages').lastChild, d.error || d.answer, 'assistant');
   document.getElementById('query-code').textContent   = d.query || 'No query generated';
   document.getElementById('query-result').textContent = d.result
     ? JSON.stringify(d.result.data, null, 2).slice(0, 800)
@@ -250,7 +250,7 @@ async function sendFilterChat() {
   });
   const d = await res.json();
 
-  document.getElementById('filterchat-messages').lastChild.textContent = d.response || d.error;
+  setMessageText(document.getElementById('filterchat-messages').lastChild, d.response || d.error, 'assistant');
 
   if (d.filters) {
     const tags = document.getElementById('filterchat-tags');
@@ -277,10 +277,23 @@ async function clearFilterChat() {
 function addMessage(containerId, role, text) {
   const el = document.createElement('div');
   el.className = `msg ${role}`;
-  el.textContent = text;
+  if (role === 'assistant') {
+    el.innerHTML = marked.parse(text);
+  } else {
+    el.textContent = text;
+  }
   const container = document.getElementById(containerId);
   container.appendChild(el);
   container.scrollTop = container.scrollHeight;
+  return el;
+}
+
+function setMessageText(el, text, role) {
+  if (role === 'assistant') {
+    el.innerHTML = marked.parse(text);
+  } else {
+    el.textContent = text;
+  }
 }
 
 // Enter key support

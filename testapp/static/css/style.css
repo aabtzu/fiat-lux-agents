@@ -60,6 +60,23 @@ tr.filtered-out td { color: #bbb; background: #fafafa !important; }
 .msg.user { background: #1a1a2e; color: #fff; align-self: flex-end; }
 .msg.assistant { background: #f0f0f0; align-self: flex-start; }
 
+/* Markdown inside assistant messages */
+.msg.assistant p  { margin: 0 0 6px; }
+.msg.assistant p:last-child { margin-bottom: 0; }
+.msg.assistant strong { font-weight: 600; }
+.msg.assistant em { font-style: italic; }
+.msg.assistant blockquote {
+  border-left: 3px solid #ccc; margin: 6px 0;
+  padding-left: 8px; color: #666;
+}
+.msg.assistant table { border-collapse: collapse; margin: 6px 0; font-size: 12px; width: auto; }
+.msg.assistant th { background: #ddd; padding: 4px 10px; text-align: left; color: #222; }
+.msg.assistant td { padding: 4px 10px; border-bottom: 1px solid #ddd; background: transparent; }
+.msg.assistant tr:hover td { background: transparent; }
+.msg.assistant code { background: #e0e0e0; padding: 1px 4px; border-radius: 3px; font-family: monospace; }
+.msg.assistant ul, .msg.assistant ol { padding-left: 18px; margin: 4px 0; }
+.msg.assistant li { margin: 2px 0; }
+
 .input-row { display: flex; gap: 8px; margin-top: 10px; }
 .input-row input {
   flex: 1; padding: 8px 12px; border: 1px solid #ddd;
