@@ -6,6 +6,36 @@ Reusable Python agents for natural language data exploration. Drop them into any
 
 ---
 
+## What it looks like
+
+Your users talk to their data. The agents handle the rest.
+
+```
+ You    ▸  only show completed sales after March
+ Bot    ▸  Filter added: completed sales after March — 6 of 15 items remaining.
+
+ You    ▸  what's the average amount for those?
+ Bot    ▸  The average sale amount is $1,035 across the 6 filtered records.
+
+ You    ▸  show me a breakdown by category
+ Bot    ▸  See chart below.
+           ┌─────────────────────────────────┐
+           │  Electronics  ████████████ $4.2k │
+           │  Clothing     ██████       $1.5k │
+           │  Food         ███          $0.5k │
+           └─────────────────────────────────┘
+
+ You    ▸  now exclude Electronics
+ Bot    ▸  Filter added: exclude Electronics — 3 of 15 items remaining.
+
+ You    ▸  clear filters
+ Bot    ▸  All filters cleared.
+```
+
+All of that — filter creation, data questions, chart generation, filter chaining — is handled by a small set of focused agents you can drop into any app.
+
+---
+
 ## Agents
 
 ### FilterBot
