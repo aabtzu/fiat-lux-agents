@@ -3,7 +3,8 @@ FilterBot - translates natural language into structured filter specifications.
 Works with any list-of-dicts dataset.
 """
 
-from typing import Dict, List
+import json
+from typing import Dict, List, Optional
 from .base import LLMBaseAgent, DEFAULT_MODEL
 
 
@@ -12,10 +13,13 @@ class FilterBot(LLMBaseAgent):
     Interprets natural language filter queries into structured filter specs
     that FilterEngine can execute.
 
+    Pass sample_data to interpret_filter() so the bot can see actual field
+    values and handle any data format (abbreviated months, mixed types, etc.)
+    without needing hardcoded examples.
+
     Usage:
         bot = FilterBot()
-        spec = bot.interpret_filter("only show completed items")
-        # {"filter_type": "include", "field": "status", "condition": "completed", ...}
+        spec = bot.interpret_filter("only show completed items", sample_data=data[:3])
     """
 
     def __init__(self, model=DEFAULT_MODEL):
@@ -26,11 +30,7 @@ class FilterBot(LLMBaseAgent):
 Your job: Interpret ANY natural language filter query and convert it to a structured filter spec.
 
 The data is a list of items (rows). Each item is a dictionary with various fields.
-Common patterns:
-- Numeric fields: counts, amounts, values, scores, etc.
-- String fields: names, categories, statuses, descriptions, etc.
-- Date fields: dates, timestamps, etc.
-- Nested fields: each item may have a "data" array with sub-measurements
+You will be shown sample rows so you can see the actual field names and value formats.
 
 CRITICAL: Return ONLY valid JSON. No markdown, no explanations, ONLY the JSON object.
 
@@ -43,15 +43,16 @@ Return format:
 }
 
 Field types:
-1. Simple field match — use when filtering on a known categorical field:
-   - Set "field" to the field name (e.g., "status", "category", "type")
-   - Set "condition" to the exact value to match
+1. Simple field match — use when filtering on a known categorical field with exact values:
+   - Set "field" to the field name (e.g., "status", "category")
+   - Set "condition" to the exact value to match (must match how it appears in the data)
 
-2. Computed filter — use for numeric comparisons, string patterns, nested data:
+2. Computed filter — use for anything involving comparison, ordering, math, or type conversion:
    - Set "field" to "computed"
-   - Set "condition" to a Python lambda expression: lambda item: <expression>
-   - Use .get() with defaults to handle missing fields safely
-   - Available: comparisons, string methods, boolean logic, list comprehensions, sum(), len(), max(), min()
+   - Set "condition" to a Python lambda: lambda item: <expression>
+   - Use .get() with safe defaults for missing fields
+   - You can use any standard Python: comparisons, string methods, list operations, etc.
+   - Look at the sample rows to understand how fields are stored, then write code accordingly
 
 Examples:
 
@@ -64,26 +65,28 @@ Examples:
 "exclude anything with 'test' in the name" →
 {"filter_type": "exclude", "field": "computed", "condition": "lambda item: 'test' in item.get('name', '').lower()", "description": "Exclude items with 'test' in name"}
 
-"more than 20 data points" →
-{"filter_type": "include", "field": "computed", "condition": "lambda item: len(item.get('data', [])) > 20", "description": "Only items with > 20 data points"}
-
-"average value above 500" →
-{"filter_type": "include", "field": "computed", "condition": "lambda item: (vals := [d.get('value') for d in item.get('data', []) if d.get('value')]) and sum(vals) / len(vals) > 500", "description": "Only items with average value > 500"}
-
 Guidelines:
-- Handle None/missing values safely with .get() and defaults
+- Always inspect the sample rows to understand field formats before writing lambdas
+- Handle type conversions yourself — if a field looks like a month name, date string, or
+  encoded value, write code that interprets it correctly based on what you see
+- Use .get() with safe defaults
 - Use case-insensitive matching for strings (.lower())
-- Interpret user intent even if phrasing is loose
-- For ambiguous queries, make a reasonable assumption
-"""
+- Interpret user intent even if phrasing is loose"""
 
-    def interpret_filter(self, user_query: str, existing_filters: List[Dict] = None) -> Dict:
+    def interpret_filter(
+        self,
+        user_query: str,
+        existing_filters: List[Dict] = None,
+        sample_data: Optional[List[Dict]] = None
+    ) -> Dict:
         """
         Interpret a natural language filter query.
 
         Args:
             user_query: Natural language filter description
             existing_filters: Currently active filters (for context)
+            sample_data: A few sample rows from the dataset so the bot can
+                         see actual field names and value formats
 
         Returns:
             Filter spec dict with keys: filter_type, field, condition, description, enabled
@@ -91,16 +94,24 @@ Guidelines:
         if existing_filters is None:
             existing_filters = []
 
+        # Show a few sample rows so the bot knows the actual data format
+        sample_section = ""
+        if sample_data:
+            samples = sample_data[:5]
+            sample_section = f"\n\nSample rows from the dataset:\n{json.dumps(samples, indent=2)}\n"
+
         filter_context = ""
         if existing_filters:
             filter_context = "\n\nCurrently active filters:\n"
             for i, f in enumerate(existing_filters, 1):
                 filter_context += f"{i}. {f.get('description', 'Unknown filter')}\n"
 
+        content = f"Interpret this filter:{sample_section}{filter_context}\n\nQuery: {user_query}"
+
         try:
             response_text = self.call_api(
                 self.system_prompt,
-                [{"role": "user", "content": f"Interpret this filter:{filter_context}\n\nQuery: {user_query}"}]
+                [{"role": "user", "content": content}]
             )
             filter_spec = self.parse_json_response(response_text)
             filter_spec['enabled'] = True

@@ -29,7 +29,7 @@ SCHEMA = """Columns:
 - status (str): completed | pending | cancelled
 - amount (float): sale amount in dollars
 - units (int): number of units sold
-- month (str): Jan through Aug
+- month (str): month abbreviation — Jan, Feb, Mar, Apr, May, Jun, Jul, Aug
 """
 
 SUMMARY = {

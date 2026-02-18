@@ -110,7 +110,8 @@ Guidelines:
         self,
         user_message: str,
         conversation_history: List[Dict],
-        data: Dict
+        data: Dict,
+        sample_data: Optional[List[Dict]] = None
     ) -> Tuple[str, Optional[str], Optional[Dict]]:
         """
         Process a conversational message.
@@ -142,7 +143,7 @@ Guidelines:
                     match = re.search(r'median.*?(\d+(?:\.\d+)?(?:e[+-]?\d+)?)', context, re.IGNORECASE)
                     if match:
                         filter_query = filter_query.replace('median', match.group(1))
-                filter_spec = self.filter_bot.interpret_filter(filter_query, [])
+                filter_spec = self.filter_bot.interpret_filter(filter_query, [], sample_data=sample_data)
                 return 'filter', None, filter_spec
 
             elif intent == 'clear':

@@ -64,7 +64,7 @@ def add_filter():
     if not message:
         return jsonify({'error': 'No message provided'}), 400
 
-    spec = filter_bot.interpret_filter(message, filter_engine.get_active_filters())
+    spec = filter_bot.interpret_filter(message, filter_engine.get_active_filters(), sample_data=SAMPLE_DATA[:5])
 
     if spec.get('error'):
         return jsonify({'error': spec['error']}), 400
@@ -153,7 +153,7 @@ def filter_chat():
     }
 
     intent, response_text, filter_spec = filter_chat_bot.process_message(
-        message, filter_chat_history, data_context
+        message, filter_chat_history, data_context, sample_data=SAMPLE_DATA[:5]
     )
 
     filter_chat_history.append({'role': 'user', 'content': message})
