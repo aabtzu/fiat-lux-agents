@@ -1,7 +1,7 @@
 // --- State ---
 let showFilteredOut = false;
 let queryScope = 'filtered'; // 'filtered' | 'all'
-let queryChart = null;
+let queryCharts = []; // track all inline charts for cleanup
 
 // --- Tab switching ---
 document.querySelectorAll('.tab').forEach(tab => {
@@ -135,22 +135,22 @@ const CHART_COLORS = [
   '#9b59b6', '#2ecc71', '#e74c3c', '#3498db', '#f39c12'
 ];
 
-function renderChart(vizConfig, columns, data) {
-  const container = document.getElementById('query-chart-container');
+function renderChartInline(containerId, vizConfig, columns, data) {
   const type = vizConfig?.type;
+  if (!type || type === 'none' || !data?.length || !columns?.length) return;
 
-  if (!type || type === 'none' || !data?.length || !columns?.length) {
-    container.style.display = 'none';
-    if (queryChart) { queryChart.destroy(); queryChart = null; }
-    return;
-  }
+  // Create a message-like div with a canvas inside it
+  const wrapper = document.createElement('div');
+  wrapper.className = 'msg chart-msg';
+  const canvas = document.createElement('canvas');
+  wrapper.appendChild(canvas);
 
-  container.style.display = 'block';
-  if (queryChart) { queryChart.destroy(); queryChart = null; }
+  const container = document.getElementById(containerId);
+  container.appendChild(wrapper);
+  container.scrollTop = container.scrollHeight;
 
   const xCol = columns[0];
-  const yCols = columns.slice(1); // support multiple value columns
-
+  const yCols = columns.slice(1);
   const labels = data.map(r => String(r[xCol]));
 
   const datasets = yCols.map((col, i) => ({
@@ -166,19 +166,17 @@ function renderChart(vizConfig, columns, data) {
     pointRadius: type === 'scatter' ? 5 : 3,
   }));
 
-  const options = {
-    responsive: true,
-    plugins: {
-      legend: { display: datasets.length > 1 }
-    },
-    scales: vizConfig.scales || {}
-  };
-
-  queryChart = new Chart(document.getElementById('query-chart'), {
+  const chart = new Chart(canvas, {
     type: type === 'scatter' ? 'scatter' : type,
     data: type === 'scatter' ? { datasets } : { labels, datasets },
-    options
+    options: {
+      responsive: true,
+      plugins: { legend: { display: datasets.length > 1 } },
+      scales: vizConfig.scales || {}
+    }
   });
+
+  queryCharts.push(chart);
 }
 
 // --- Query scope toggle ---
@@ -220,17 +218,18 @@ async function sendQuery() {
     : d.error || '';
 
   if (d.result?.success) {
-    renderChart(d.visualization, d.result.columns, d.result.data);
+    renderChartInline('query-messages', d.visualization, d.result.columns, d.result.data);
   }
 }
 
 async function clearQueryHistory() {
   await fetch('/api/query/clear', { method: 'POST' });
+  queryCharts.forEach(c => c.destroy());
+  queryCharts = [];
   document.getElementById('query-messages').innerHTML =
     '<div class="msg assistant">Ask a question about the data.</div>';
   document.getElementById('query-code').textContent   = 'None yet';
   document.getElementById('query-result').textContent = 'None yet';
-  renderChart(null, null, null);
 }
 
 // --- Filter Chat ---

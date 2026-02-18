@@ -106,10 +106,10 @@ pre {
 .empty { color: #999; font-size: 13px; font-style: italic; }
 .loading { color: #888; font-size: 12px; }
 
-/* Chart */
-.chart-container {
-  background: #fff; border: 1px solid #ddd; border-radius: 6px;
-  padding: 16px; margin-top: 12px;
+/* Inline chart message in chat flow */
+.msg.chart-msg {
+  background: #fff; border: 1px solid #ddd;
+  padding: 12px; width: 95%; align-self: stretch;
 }
 
 /* Scope toggle — reusable "all vs filtered" pattern */
