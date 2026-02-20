@@ -87,6 +87,7 @@ class ChartDigitizerBot(LLMBaseAgent):
         best_count = 0
         result = None
         prev_count = 0
+        pass_history: list[dict] = []
 
         for pass_num in range(1, max_passes + 1):
             is_first = pass_num == 1
@@ -120,11 +121,18 @@ class ChartDigitizerBot(LLMBaseAgent):
                     best_result = {k: [] for k in data_keys}
                     best_result["_passes"] = pass_num
                     best_result["_stop_reason"] = "error"
+                    best_result["_pass_history"] = pass_history
                     return best_result
 
             result = parsed
             curr_count = sum(len(result.get(k, [])) for k in data_keys)
             delta = curr_count - prev_count  # signed: positive = improvement
+
+            # Record this pass in history (data series + counts)
+            pass_record: dict = {"pass_num": pass_num}
+            for k in data_keys:
+                pass_record[k] = result.get(k, [])
+            pass_history.append(pass_record)
 
             # Track the best result by total point count
             if curr_count > best_count:
@@ -138,6 +146,7 @@ class ChartDigitizerBot(LLMBaseAgent):
             if pass_num > 1 and abs(delta) < min_new_points:
                 best_result["_passes"] = pass_num
                 best_result["_stop_reason"] = "stabilized"
+                best_result["_pass_history"] = pass_history
                 return best_result
 
             prev_count = curr_count
@@ -147,6 +156,7 @@ class ChartDigitizerBot(LLMBaseAgent):
 
         best_result["_passes"] = max_passes
         best_result["_stop_reason"] = "max_passes"
+        best_result["_pass_history"] = pass_history
         return best_result
 
     # ── Prompts ───────────────────────────────────────────────────────────────
