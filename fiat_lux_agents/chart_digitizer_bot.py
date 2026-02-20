@@ -101,7 +101,8 @@ class ChartDigitizerBot(LLMBaseAgent):
                     best_result, data_keys, x_field
                 )
                 prompt = self._refinement_prompt(
-                    chart_description, data_keys, x_field, pass_num, best_count
+                    chart_description, data_keys, x_field, pass_num, best_count,
+                    best_result,
                 )
                 images = [image_bytes, comparison_bytes]
 
@@ -203,7 +204,14 @@ If a series is absent from this chart, return [].
         x_field: str,
         pass_num: int,
         prev_count: int,
+        best_result: dict,
     ) -> str:
+        feedback = _analyze_pass_feedback(best_result, data_keys, x_field)
+        feedback_section = ""
+        if feedback:
+            items = "\n".join(f"- {f}" for f in feedback)
+            feedback_section = f"\nSPECIFIC ISSUES IN YOUR PREVIOUS ATTEMPT:\n{items}\n"
+
         return f"""You are refining a scientific chart digitization. You have been given \
 TWO images:
 - Image 1: The ORIGINAL chart to digitize
@@ -211,11 +219,11 @@ TWO images:
 
 CHART DESCRIPTION:
 {chart_description}
-
+{feedback_section}
 YOUR TASK:
 1. Carefully compare Image 1 (original) against Image 2 (your previous attempt).
-2. Find regions where Image 2 looks SMOOTHER than Image 1 — those are missing peaks/troughs.
-3. Find regions where Image 2 is MISSING data entirely.
+2. Fix every issue listed above — these are known gaps or errors in the previous attempt.
+3. Find any other regions where Image 2 looks SMOOTHER than Image 1 (missing peaks/troughs).
 4. Return a COMPLETE corrected dataset — not just the differences, but ALL points.
 
 Your previous attempt had {prev_count} total points across all series.
@@ -374,3 +382,76 @@ def _repair_truncated_json(text: str) -> str:
     close_map = {"[": "]", "{": "}"}
     closing = "".join(close_map[c] for c in reversed(stack))
     return text + "\n" + closing if closing else text
+
+
+def _analyze_pass_feedback(
+    result: dict, data_keys: list[str], x_field: str
+) -> list[str]:
+    """
+    Analyze the best result so far and produce specific feedback for the refinement prompt.
+
+    Checks for:
+    - Series that returned zero points despite being listed in data_keys
+    - Large x-axis gaps in value series (regions likely missed)
+    - Regions where the curve is suspiciously flat (may be over-smoothed)
+    """
+    issues: list[str] = []
+
+    for key in data_keys:
+        pts = result.get(key, [])
+        value_pts = sorted(
+            [p for p in pts if x_field in p and "value" in p],
+            key=lambda p: p[x_field],
+        )
+        marker_pts = [p for p in pts if x_field in p and "value" not in p]
+
+        if not pts:
+            issues.append(
+                f'"{key}" returned 0 points — this series IS present in the chart; '
+                f"do not return []"
+            )
+            continue
+
+        if not value_pts:
+            # marker-only series — just count
+            continue
+
+        # ── Large gaps ────────────────────────────────────────────────────────
+        if len(value_pts) >= 2:
+            x_span = value_pts[-1][x_field] - value_pts[0][x_field]
+            # Flag gaps larger than 5% of the total x-range or 20 units, whichever is bigger
+            gap_threshold = max(20.0, x_span * 0.05)
+            for i in range(len(value_pts) - 1):
+                x0 = value_pts[i][x_field]
+                x1 = value_pts[i + 1][x_field]
+                gap = x1 - x0
+                if gap > gap_threshold:
+                    issues.append(
+                        f'"{key}": no points between {x_field} {x0:.0f}–{x1:.0f} '
+                        f"(gap of {gap:.0f}) — look carefully for peaks/troughs here"
+                    )
+
+        # ── Suspiciously flat regions ─────────────────────────────────────────
+        window = 6
+        if len(value_pts) >= window:
+            y_global_range = (
+                max(p["value"] for p in value_pts)
+                - min(p["value"] for p in value_pts)
+            )
+            flat_threshold = max(10.0, y_global_range * 0.04)
+            i = 0
+            while i <= len(value_pts) - window:
+                seg = value_pts[i : i + window]
+                seg_y_range = max(p["value"] for p in seg) - min(p["value"] for p in seg)
+                seg_x_span = seg[-1][x_field] - seg[0][x_field]
+                if seg_y_range < flat_threshold and seg_x_span > gap_threshold:
+                    issues.append(
+                        f'"{key}": values look unusually flat between '
+                        f'{x_field} {seg[0][x_field]:.0f}–{seg[-1][x_field]:.0f} '
+                        f"(range only {seg_y_range:.1f}) — may be smoothing over real oscillations"
+                    )
+                    i += window  # skip ahead to avoid repeating the same region
+                else:
+                    i += 1
+
+    return issues
