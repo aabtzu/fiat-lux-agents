@@ -83,6 +83,8 @@ class ChartDigitizerBot(LLMBaseAgent):
               "_passes"      — number of passes actually performed
               "_stop_reason" — "stabilized" | "max_passes" | "error"
         """
+        best_result: dict | None = None
+        best_count = 0
         result = None
         prev_count = 0
 
@@ -93,9 +95,12 @@ class ChartDigitizerBot(LLMBaseAgent):
                 prompt = self._initial_prompt(chart_description, data_keys, x_field)
                 images = [image_bytes]
             else:
-                comparison_bytes = self._make_comparison_chart(result, data_keys, x_field)
+                # Use the best result so far for the comparison chart
+                comparison_bytes = self._make_comparison_chart(
+                    best_result, data_keys, x_field
+                )
                 prompt = self._refinement_prompt(
-                    chart_description, data_keys, x_field, pass_num, prev_count
+                    chart_description, data_keys, x_field, pass_num, best_count
                 )
                 images = [image_bytes, comparison_bytes]
 
@@ -110,34 +115,39 @@ class ChartDigitizerBot(LLMBaseAgent):
                 try:
                     parsed = json.loads(repaired)
                 except json.JSONDecodeError:
-                    if result is not None:
-                        # keep last good result
+                    if best_result is not None:
                         break
-                    result = {k: [] for k in data_keys}
-                    result["_passes"] = pass_num
-                    result["_stop_reason"] = "error"
-                    return result
+                    best_result = {k: [] for k in data_keys}
+                    best_result["_passes"] = pass_num
+                    best_result["_stop_reason"] = "error"
+                    return best_result
 
             result = parsed
             curr_count = sum(len(result.get(k, [])) for k in data_keys)
-            delta = abs(curr_count - prev_count)
+            delta = curr_count - prev_count  # signed: positive = improvement
+
+            # Track the best result by total point count
+            if curr_count > best_count:
+                best_result = result
+                best_count = curr_count
 
             if on_pass:
                 on_pass(pass_num, result)
 
-            if pass_num > 1 and delta < min_new_points:
-                result["_passes"] = pass_num
-                result["_stop_reason"] = "stabilized"
-                return result
+            # Stop if the current pass didn't add meaningful new points vs the best
+            if pass_num > 1 and abs(delta) < min_new_points:
+                best_result["_passes"] = pass_num
+                best_result["_stop_reason"] = "stabilized"
+                return best_result
 
             prev_count = curr_count
 
-        if result is None:
-            result = {k: [] for k in data_keys}
+        if best_result is None:
+            best_result = {k: [] for k in data_keys}
 
-        result["_passes"] = max_passes
-        result["_stop_reason"] = "max_passes"
-        return result
+        best_result["_passes"] = max_passes
+        best_result["_stop_reason"] = "max_passes"
+        return best_result
 
     # ── Prompts ───────────────────────────────────────────────────────────────
 
