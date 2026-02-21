@@ -8,6 +8,7 @@ from .chart_digitizer_bot import ChartDigitizerBot
 from .hierarchical_filter_bot import HierarchicalFilterBot
 from .hierarchical_filter_engine import HierarchicalFilterEngine
 from .hierarchical_filter_chat_bot import HierarchicalFilterChatBot
+from .summary_bot import SummaryBot
 
 __all__ = [
     "LLMBase",
@@ -22,4 +23,5 @@ __all__ = [
     "HierarchicalFilterBot",
     "HierarchicalFilterEngine",
     "HierarchicalFilterChatBot",
+    "SummaryBot",
 ]
