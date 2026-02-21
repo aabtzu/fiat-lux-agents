@@ -6,10 +6,10 @@ The calling app executes the query against its own DataFrame and renders the cha
 import json
 from datetime import datetime
 from typing import Dict, List, Optional
-from .base import LLMBaseAgent, clean_json_string, DEFAULT_MODEL
+from .base import LLMBase, clean_json_string, DEFAULT_MODEL
 
 
-class ChatBot(LLMBaseAgent):
+class ChatBot(LLMBase):
     """
     Answers natural language questions about tabular data by returning:
     - answer: brief text response
@@ -51,9 +51,10 @@ CRITICAL RESPONSE FORMAT — return ONLY this JSON with exactly 3 fields:
 No other fields. No markdown. ONLY the JSON object.
 
 Answer guidelines:
-- Keep the answer brief and generic ("See chart and table below.")
-- Do NOT list specific values in the answer — the frontend will show the data
-- You don't have access to the data, so don't make up values
+- MUST be one short sentence like "See chart and table below." or "Here are the results."
+- Do NOT create ASCII charts, tables, histograms, or lists of values in the answer
+- Do NOT include statistics, percentages, or specific data values in the answer
+- The frontend renders the chart and table — the answer field is only a caption
 
 Query guidelines:
 - DataFrame is named 'df'
@@ -67,8 +68,10 @@ Visualization guidelines:
 - "bar" for comparisons and rankings
 - "line" for time series
 - "scatter" for correlations
+- "histogram" for distributions of a single variable — return raw values, NOT pre-binned; default 10 bins, specify with {{"type": "histogram", "nbins": 20}} if requested
+- "box" for statistical spread (median, IQR, outliers) — return raw values per group
 - "none" for plain table results
-- For log scale: {{"type": "bar", "scales": {{"y": {{"type": "logarithmic"}}}}}}
+- For log scale: {{"type": "bar", "log_y": true}}
 
 CRITICAL: Return ONLY valid JSON with exactly 3 fields."""
 

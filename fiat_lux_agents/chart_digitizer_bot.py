@@ -21,10 +21,10 @@ import json
 import re
 from typing import Callable
 
-from .base import LLMBaseAgent, DEFAULT_MODEL
+from .base import LLMBase, DEFAULT_MODEL
 
 
-class ChartDigitizerBot(LLMBaseAgent):
+class ChartDigitizerBot(LLMBase):
     """
     Self-correcting scientific chart digitizer.
 

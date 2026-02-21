@@ -7,11 +7,11 @@ Handles data questions, filter creation, and filter clearing in the same chat th
 import json
 import re
 from typing import Dict, List, Optional, Tuple
-from .base import LLMBaseAgent, DEFAULT_MODEL
+from .base import LLMBase, DEFAULT_MODEL
 from .hierarchical_filter_bot import HierarchicalFilterBot
 
 
-class HierarchicalFilterChatBot(LLMBaseAgent):
+class HierarchicalFilterChatBot(LLMBase):
     """
     Handles mixed conversations for hierarchical entity data where the user might
     ask data questions, request filters, or clear filters in the same thread.

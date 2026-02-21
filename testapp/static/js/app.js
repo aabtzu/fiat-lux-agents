@@ -130,53 +130,84 @@ async function clearFilters() {
 }
 
 // --- Chart rendering ---
-const CHART_COLORS = [
-  '#1a1a2e', '#4a90d9', '#e85d5d', '#50b86c', '#f0a500',
-  '#9b59b6', '#2ecc71', '#e74c3c', '#3498db', '#f39c12'
-];
-
 function renderChartInline(containerId, vizConfig, columns, data) {
   const type = vizConfig?.type;
   if (!type || type === 'none' || !data?.length || !columns?.length) return;
 
-  // Create a message-like div with a canvas inside it
   const wrapper = document.createElement('div');
   wrapper.className = 'msg chart-msg';
-  const canvas = document.createElement('canvas');
-  wrapper.appendChild(canvas);
+  wrapper.style.height = '320px';
 
   const container = document.getElementById(containerId);
   container.appendChild(wrapper);
   container.scrollTop = container.scrollHeight;
 
   const xCol = columns[0];
+  const valueCol = columns[columns.length - 1];
   const yCols = columns.slice(1);
-  const labels = data.map(r => String(r[xCol]));
+  const logY = vizConfig?.log_y || false;
 
-  const datasets = yCols.map((col, i) => ({
-    label: col,
-    data: type === 'scatter'
-      ? data.map(r => ({ x: r[xCol], y: r[col] }))
-      : data.map(r => r[col]),
-    backgroundColor: CHART_COLORS[i % CHART_COLORS.length] + (type === 'line' ? '33' : 'cc'),
-    borderColor: CHART_COLORS[i % CHART_COLORS.length],
-    borderWidth: type === 'line' ? 2 : 1,
-    fill: false,
-    tension: 0.3,
-    pointRadius: type === 'scatter' ? 5 : 3,
-  }));
+  const layout = {
+    height: 300,
+    margin: {t: 20, r: 10, b: 60, l: 50},
+    paper_bgcolor: 'white',
+    plot_bgcolor: '#fafafa',
+    font: {size: 11},
+    yaxis: logY ? {type: 'log'} : {},
+    xaxis: {tickangle: -35}
+  };
 
-  const chart = new Chart(canvas, {
-    type: type === 'scatter' ? 'scatter' : type,
-    data: type === 'scatter' ? { datasets } : { labels, datasets },
-    options: {
-      responsive: true,
-      plugins: { legend: { display: datasets.length > 1 } },
-      scales: vizConfig.scales || {}
-    }
-  });
+  let traces = [];
 
-  queryCharts.push(chart);
+  if (type === 'histogram') {
+    traces = [{
+      type: 'histogram',
+      x: data.map(r => r[valueCol]),
+      name: valueCol,
+      marker: {color: 'rgba(26, 26, 46, 0.75)'},
+      nbinsx: vizConfig?.nbins || 10
+    }];
+    layout.xaxis = {title: valueCol};
+    layout.yaxis = {title: 'Count'};
+    layout.bargap = 0.05;
+
+  } else if (type === 'box') {
+    traces = yCols.map(col => ({
+      type: 'box', y: data.map(r => r[col]), name: col, boxpoints: 'outliers'
+    }));
+
+  } else if (type === 'scatter') {
+    const yCol = columns[1] || valueCol;
+    traces = [{
+      type: 'scatter', mode: 'markers',
+      x: data.map(r => r[xCol]), y: data.map(r => r[yCol]),
+      text: data.map(r => r[xCol]),
+      hovertemplate: '%{text}<br>x=%{x}, y=%{y}<extra></extra>',
+      marker: {color: 'rgba(26, 26, 46, 0.75)', size: 7}
+    }];
+    layout.xaxis.title = xCol;
+    layout.yaxis.title = yCol;
+
+  } else if (type === 'line') {
+    traces = yCols.map(col => ({
+      type: 'scatter', mode: 'lines+markers',
+      x: data.map(r => r[xCol]), y: data.map(r => r[col]), name: col
+    }));
+    layout.xaxis.title = xCol;
+
+  } else {
+    // bar
+    traces = yCols.map(col => ({
+      type: 'bar',
+      x: data.map(r => r[xCol]), y: data.map(r => r[col]), name: col,
+      marker: {color: 'rgba(26, 26, 46, 0.75)'}
+    }));
+    layout.xaxis.title = xCol;
+  }
+
+  Plotly.newPlot(wrapper, traces, layout, {responsive: false, displayModeBar: false});
+  // Track div for cleanup on clear
+  queryCharts.push(wrapper);
 }
 
 // --- Query scope toggle ---
@@ -192,6 +223,30 @@ function updateScopeLabel() {
   const el = document.getElementById('query-scope-label');
   if (!el) return;
   el.textContent = queryScope === 'filtered' ? '(filtered rows)' : '(all rows)';
+}
+
+// --- Histogram bin summary for table display ---
+function formatHistogramBins(data, valueCol, nbins) {
+  const values = data.map(r => r[valueCol]).filter(v => v != null && !isNaN(v));
+  if (!values.length) return 'No data';
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const binWidth = (max - min) / nbins;
+  const bins = Array.from({length: nbins}, (_, i) => ({
+    lo: min + i * binWidth,
+    hi: min + (i + 1) * binWidth,
+    count: 0
+  }));
+  values.forEach(v => {
+    let i = Math.floor((v - min) / binWidth);
+    if (i >= nbins) i = nbins - 1;
+    bins[i].count++;
+  });
+  const fmt = n => Number.isInteger(n) ? n.toString() : n.toFixed(2);
+  return bins
+    .filter(b => b.count > 0)
+    .map(b => `${fmt(b.lo)} – ${fmt(b.hi)}: ${b.count}`)
+    .join('\n');
 }
 
 // --- Query ---
@@ -212,19 +267,27 @@ async function sendQuery() {
   const d = await res.json();
 
   setMessageText(document.getElementById('query-messages').lastChild, d.error || d.answer, 'assistant');
-  document.getElementById('query-code').textContent   = d.query || 'No query generated';
-  document.getElementById('query-result').textContent = d.result
-    ? JSON.stringify(d.result.data, null, 2).slice(0, 800)
-    : d.error || '';
+  document.getElementById('query-code').textContent = d.query || 'No query generated';
 
   if (d.result?.success) {
+    const isHistogram = d.visualization?.type === 'histogram';
+    if (isHistogram) {
+      const valueCol = d.result.columns[d.result.columns.length - 1];
+      const nbins = d.visualization?.nbins || 10;
+      document.getElementById('query-result').textContent = formatHistogramBins(d.result.data, valueCol, nbins);
+    } else {
+      document.getElementById('query-result').textContent =
+        JSON.stringify(d.result.data, null, 2).slice(0, 800);
+    }
     renderChartInline('query-messages', d.visualization, d.result.columns, d.result.data);
+  } else {
+    document.getElementById('query-result').textContent = d.error || '';
   }
 }
 
 async function clearQueryHistory() {
   await fetch('/api/query/clear', { method: 'POST' });
-  queryCharts.forEach(c => c.destroy());
+  queryCharts.forEach(div => Plotly.purge(div));
   queryCharts = [];
   document.getElementById('query-messages').innerHTML =
     '<div class="msg assistant">Ask a question about the data.</div>';

@@ -1,4 +1,4 @@
-from .base import LLMBaseAgent, clean_json_string
+from .base import LLMBase, clean_json_string
 from .filter_bot import FilterBot
 from .filter_engine import FilterEngine
 from .chat_bot import ChatBot
@@ -10,7 +10,7 @@ from .hierarchical_filter_engine import HierarchicalFilterEngine
 from .hierarchical_filter_chat_bot import HierarchicalFilterChatBot
 
 __all__ = [
-    "LLMBaseAgent",
+    "LLMBase",
     "clean_json_string",
     "FilterBot",
     "FilterEngine",

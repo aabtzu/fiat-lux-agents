@@ -5,10 +5,10 @@ Works with any list-of-dicts dataset.
 
 import json
 from typing import Dict, List, Optional
-from .base import LLMBaseAgent, DEFAULT_MODEL
+from .base import LLMBase, DEFAULT_MODEL
 
 
-class FilterBot(LLMBaseAgent):
+class FilterBot(LLMBase):
     """
     Interprets natural language filter queries into structured filter specs
     that FilterEngine can execute.

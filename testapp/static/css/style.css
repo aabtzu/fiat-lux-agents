@@ -110,6 +110,7 @@ pre {
 .msg.chart-msg {
   background: #fff; border: 1px solid #ddd;
   padding: 12px; width: 95%; align-self: stretch;
+  flex-shrink: 0; min-height: 320px;
 }
 
 /* Scope toggle — reusable "all vs filtered" pattern */

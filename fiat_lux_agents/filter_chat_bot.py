@@ -6,11 +6,11 @@ and filter clearing in the same chat thread.
 import json
 import re
 from typing import Dict, List, Optional, Tuple
-from .base import LLMBaseAgent, DEFAULT_MODEL
+from .base import LLMBase, DEFAULT_MODEL
 from .filter_bot import FilterBot
 
 
-class FilterChatBot(LLMBaseAgent):
+class FilterChatBot(LLMBase):
     """
     Handles mixed conversations where the user might ask data questions,
     request filters, or clear filters in the same thread.
@@ -164,7 +164,15 @@ Guidelines:
 
     def _answer_question(self, question: str, data: Dict, context: str) -> str:
         """Answer a data question using Claude with the provided data as context."""
-        prompt = f"""You are analyzing a dataset.
+        prompt = f"""You are analyzing a dataset. Answer the question in plain text only.
+
+STRICT RULES:
+- 1-3 sentences maximum
+- NO ASCII charts, histograms, bar charts, or tables
+- NO markdown headers, bullet lists, or formatting
+- NO detailed breakdowns or bin-by-bin analysis
+- If asked for a histogram, chart, or visualization, say: "Use the Query tab for charts and histograms."
+- Just state the key fact or number directly
 
 Data summary:
 {json.dumps(data, indent=2, default=str)[:4000]}
@@ -172,9 +180,7 @@ Data summary:
 Previous conversation:
 {context}
 
-Question: {question}
-
-Answer concisely and precisely. Show your calculation if relevant."""
+Question: {question}"""
 
         try:
             return self.call_api(prompt, [{"role": "user", "content": question}])

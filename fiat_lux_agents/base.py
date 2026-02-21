@@ -24,8 +24,8 @@ def clean_json_string(json_str):
     return json_str.strip()
 
 
-class LLMBaseAgent:
-    """Base class for all Claude-powered agents."""
+class LLMBase:
+    """Base class for all Claude-powered bots."""
 
     def __init__(self, model=DEFAULT_MODEL, max_tokens=4000):
         api_key = os.getenv('ANTHROPIC_API_KEY')

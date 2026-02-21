@@ -8,10 +8,10 @@ or the child array directly via lambda drill-down.
 
 import json
 from typing import Dict, List, Optional
-from .base import LLMBaseAgent, DEFAULT_MODEL
+from .base import LLMBase, DEFAULT_MODEL
 
 
-class HierarchicalFilterBot(LLMBaseAgent):
+class HierarchicalFilterBot(LLMBase):
     """
     Interprets natural language filter queries for hierarchical entity data.
 
