@@ -171,26 +171,27 @@ Guidelines:
             return 'question', f"Sorry, I encountered an error: {str(e)}", None
 
     def _answer_question(self, question: str, data: List[Dict], context: str) -> str:
-        """Answer a data question using Claude with the entity list as context."""
-        # Truncate: max 50 entities, child arrays to 3 rows each, 6000 char limit
-        truncated = []
-        for entity in data[:50]:
-            entity_copy = dict(entity)
-            if self.child_field in entity_copy and isinstance(entity_copy[self.child_field], list):
-                entity_copy[self.child_field] = entity_copy[self.child_field][:3]
-            truncated.append(entity_copy)
+        """Answer a data question using Claude with the entity list as context.
 
-        data_json = json.dumps(truncated, indent=2, default=str)[:6000]
+        Strips child arrays from entities — the enriched scalar fields (max_vl,
+        vl_count, scid_status, etc.) are sufficient for counting and grouping
+        questions, and omitting arrays lets all entities fit in the prompt.
+        """
+        flat_entities = [
+            {k: v for k, v in entity.items() if k != self.child_field}
+            for entity in data
+        ]
+        data_json = json.dumps(flat_entities, indent=2, default=str)[:8000]
 
-        prompt = f"""You are analyzing a dataset of {self.entity_name}s. Answer the question concisely.
+        prompt = f"""You are analyzing a dataset of {self.entity_name}s. Answer the question directly with the actual number or fact.
 
 STRICT RULES:
+- State the specific answer (e.g. "There are 23 SCID horses.") — never say "here are the counts" without giving them
 - 1-3 sentences maximum
-- NO ASCII charts, histograms, or tables
-- NO markdown headers or bullet lists
-- Just state the key fact or number directly
+- NO ASCII charts, histograms, tables, or bullet lists
+- Compute the answer from the data below; do not ask for more information
 
-Data ({len(data)} {self.entity_name}s, showing up to 50):
+All {len(data)} {self.entity_name}s (child measurement arrays excluded — use the precomputed fields):
 {data_json}
 
 Previous conversation:
