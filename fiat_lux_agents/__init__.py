@@ -5,6 +5,9 @@ from .chat_bot import ChatBot
 from .query_engine import validate_query, execute_query
 from .filter_chat_bot import FilterChatBot
 from .chart_digitizer_bot import ChartDigitizerBot
+from .hierarchical_filter_bot import HierarchicalFilterBot
+from .hierarchical_filter_engine import HierarchicalFilterEngine
+from .hierarchical_filter_chat_bot import HierarchicalFilterChatBot
 
 __all__ = [
     "LLMBaseAgent",
@@ -16,4 +19,7 @@ __all__ = [
     "validate_query",
     "execute_query",
     "ChartDigitizerBot",
+    "HierarchicalFilterBot",
+    "HierarchicalFilterEngine",
+    "HierarchicalFilterChatBot",
 ]
