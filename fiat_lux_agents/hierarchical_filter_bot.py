@@ -131,11 +131,11 @@ Guidelines:
 
         filter_context = ""
         if existing_filters:
-            filter_context = "\n\nCurrently active filters:\n"
+            filter_context = "\n\nAlready-active filters (already applied — do NOT combine or re-express these; generate only the NEW independent filter for the query below):\n"
             for i, f in enumerate(existing_filters, 1):
                 filter_context += f"{i}. {f.get('description', 'Unknown filter')}\n"
 
-        content = f"Interpret this filter:{sample_section}{filter_context}\n\nQuery: {user_query}"
+        content = f"Interpret this filter:{sample_section}{filter_context}\n\nNew filter query (generate this filter ONLY, independent of existing filters above): {user_query}"
 
         try:
             response_text = self.call_api(
