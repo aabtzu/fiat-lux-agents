@@ -6,6 +6,10 @@ Validates code against a blocklist, then executes in a restricted namespace.
 import pandas as pd
 import numpy as np
 import ast
+try:
+    import scipy.stats as _scipy_stats
+except ImportError:
+    _scipy_stats = None
 
 # Long, unambiguous strings safe to check as substrings in code text
 BLOCKED_SUBSTRINGS = {
@@ -85,6 +89,8 @@ def execute_query(query_code: str, df: pd.DataFrame, max_rows: int = 1000) -> di
 
     safe_namespace = {
         'pd': pd,
+        'np': np,
+        'scipy_stats': _scipy_stats,
         'df': df.copy(),
         '__builtins__': {
             'len': len, 'max': max, 'min': min, 'sum': sum,
@@ -92,6 +98,8 @@ def execute_query(query_code: str, df: pd.DataFrame, max_rows: int = 1000) -> di
             'list': list, 'dict': dict, 'str': str,
             'int': int, 'float': float, 'bool': bool,
             'True': True, 'False': False, 'None': None,
+            'range': range, 'enumerate': enumerate, 'zip': zip,
+            'print': print,
         }
     }
 
@@ -171,6 +179,7 @@ def execute_fig_code(fig_code: str, df: pd.DataFrame, result: pd.DataFrame = Non
         'go': go,
         'pd': pd,
         'np': np,
+        'scipy_stats': _scipy_stats,
         '__builtins__': {
             'len': len, 'max': max, 'min': min, 'sum': sum,
             'abs': abs, 'round': round, 'sorted': sorted,

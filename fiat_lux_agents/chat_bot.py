@@ -52,26 +52,30 @@ CRITICAL RESPONSE FORMAT — return ONLY this JSON with exactly 3 fields:
 No other fields. No markdown. ONLY the JSON object.
 
 Answer guidelines:
-- MUST be one short sentence like "See chart and table below." or "Here are the results."
-- Do NOT create ASCII charts, tables, histograms, or lists of values in the answer
-- Do NOT include statistics, percentages, or specific data values in the answer
-- The frontend renders the chart and table — the answer field is only a caption
+- For compound questions (e.g. "show chart AND tell me the R²"), include the computed stats in the answer text AND show the chart
+- For pure display requests ("show chart"), one short sentence is fine
+- Do NOT create ASCII tables or lists of raw values in the answer
+- Computed statistics (R², p-value, mean, count, etc.) ARE allowed and encouraged in the answer when asked
 
 Query guidelines:
+- NO import statements — pre-imported: pd, np, scipy_stats (scipy.stats), df already loaded
 - DataFrame is named 'df'
 - MUST assign result to variable named 'result'
+- Use scipy_stats for regression: slope, intercept, r, p, se = scipy_stats.linregress(x, y)
 - For top N: result = df.groupby('name')['value'].max().nlargest(10).reset_index()
-- For time series: filter by entity, sort by time column
 - For comparisons: groupby + agg
 
 Fig_code guidelines:
+- NO import statements — pre-imported: px, go, pd, np, scipy_stats (scipy.stats)
 - Set "fig_code" to null for plain table results with no visualization
-- Available variables: df (full DataFrame), result (from query above), px, go, pd, np
+- Available variables: df (full DataFrame), result (from query above)
 - MUST assign a Plotly figure to a variable named 'fig'
 - Use plotly.express (px) for most charts — simpler and nicer defaults
 - Use plotly.graph_objects (go) only for multi-trace or custom charts
 - Apply good aesthetics: labels, titles, axis titles
-- For regression lines: use np.polyfit or px.scatter(trendline="ols")
+- For scatter with regression + R²: use px.scatter(trendline='ols') and put R² in title or annotation
+  Example: r_val = scipy_stats.linregress(data['x'], data['y']); r2 = r_val.rvalue**2
+  Then: title=f'Y vs X<br><sup>R² = {{r2:.3f}}, p = {{r_val.pvalue:.4f}}</sup>'
 - For log axes: use log_x=True or log_y=True in px calls
 - Example bar:     fig = px.bar(result, x='category', y='value', title='Top values')
 - Example line:    fig = px.line(result, x='DPI', y='VL_log10', color='Horse_Name')
@@ -79,7 +83,7 @@ Fig_code guidelines:
 - Example hist:    fig = px.histogram(result, x='value', nbins=20, title='Distribution')
 - Example box:     fig = px.box(result, x='group', y='value')
 
-CRITICAL: Return ONLY valid JSON with exactly 3 fields. Escape newlines in fig_code as \\n."""
+CRITICAL: Return ONLY valid JSON with exactly 3 fields. NO import statements anywhere. Escape newlines as \\n."""
 
     def process_query(
         self,
