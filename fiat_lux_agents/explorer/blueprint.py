@@ -43,6 +43,8 @@ def make_explorer_blueprint(
     welcome_text: str = "Ask questions about your data using natural language.",
     url_prefix: str = "/explorer",
     blueprint_name: str = "explorer",
+    show_scope_toggle: bool = False,
+    default_scope: str = "all",
 ) -> ExplorerBlueprint:
     """
     Create a self-contained Flask Blueprint for the data explorer.
@@ -61,12 +63,14 @@ def make_explorer_blueprint(
         ExplorerBlueprint with .explorer_config dict for template rendering
     """
     explorer_config = {
-        'query_url':        f'{url_prefix}/query',
-        'clear_url':        f'{url_prefix}/query/clear',
-        'static_url':       f'{url_prefix}/static',
-        'welcome_title':    welcome_title,
-        'welcome_text':     welcome_text,
-        'example_questions': example_questions or [],
+        'query_url':          f'{url_prefix}/query',
+        'clear_url':          f'{url_prefix}/query/clear',
+        'static_url':         f'{url_prefix}/static',
+        'welcome_title':      welcome_title,
+        'welcome_text':       welcome_text,
+        'example_questions':  example_questions or [],
+        'show_scope_toggle':  show_scope_toggle,
+        'defaultScope':       default_scope,
     }
 
     bp = ExplorerBlueprint(

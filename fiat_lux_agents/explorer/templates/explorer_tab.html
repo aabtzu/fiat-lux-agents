@@ -26,12 +26,13 @@
         </div>
 
         {% if _cfg.get('show_scope_toggle', False) %}
+        {% set _scope = _cfg.get('defaultScope', 'all') %}
         <div class="fla-scope-bar">
             <div class="fla-scope-toggle">
-                <button class="fla-scope-btn active" data-scope="filtered" onclick="Explorer.setScope('filtered')">Filtered</button>
-                <button class="fla-scope-btn" data-scope="all" onclick="Explorer.setScope('all')">All</button>
+                <button class="fla-scope-btn {{ 'active' if _scope == 'filtered' else '' }}" data-scope="filtered" onclick="Explorer.setScope('filtered')">Filtered</button>
+                <button class="fla-scope-btn {{ 'active' if _scope == 'all' else '' }}" data-scope="all" onclick="Explorer.setScope('all')">All</button>
             </div>
-            <span id="fla-scope-label" class="fla-scope-label">(using active filters)</span>
+            <span id="fla-scope-label" class="fla-scope-label">{{ '(using active filters)' if _scope == 'filtered' else '(all data)' }}</span>
         </div>
         {% endif %}
 
