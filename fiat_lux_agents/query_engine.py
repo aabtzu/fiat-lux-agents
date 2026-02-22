@@ -7,13 +7,24 @@ import pandas as pd
 import numpy as np
 import ast
 
-BLOCKED_OPERATIONS = {
-    'eval', 'exec', '__import__', 'open', 'compile', 'globals', 'locals',
-    'vars', 'dir', '__builtins__', 'getattr', 'setattr', 'delattr',
-    'hasattr', 'callable', '__class__', '__dict__', '__code__',
-    'os', 'sys', 'subprocess', 'importlib', 'pickle', 'shelve',
-    'input', 'raw_input', 'file', 'execfile'
+# Long, unambiguous strings safe to check as substrings in code text
+BLOCKED_SUBSTRINGS = {
+    '__import__', '__builtins__', '__class__', '__dict__', '__code__',
+    'subprocess', 'importlib', 'execfile', 'raw_input',
 }
+
+# All blocked identifiers — checked at AST level (function calls + import names)
+# Short names like 'os'/'sys' must only be checked by AST to avoid false positives
+# (e.g. 'os' appears in 'position', 'annotation_position', etc.)
+BLOCKED_CALLS = {
+    'eval', 'exec', '__import__', 'open', 'compile', 'globals', 'locals',
+    'vars', 'dir', 'getattr', 'setattr', 'delattr', 'hasattr', 'callable',
+    'os', 'sys', 'subprocess', 'importlib', 'pickle', 'shelve',
+    'input', 'raw_input', 'file', 'execfile',
+}
+
+# Keep for backwards-compat (used by external callers checking the set)
+BLOCKED_OPERATIONS = BLOCKED_SUBSTRINGS | BLOCKED_CALLS
 
 
 class QueryValidationError(Exception):
@@ -28,8 +39,9 @@ def validate_query(query_code: str):
     if not query_code or not isinstance(query_code, str):
         raise QueryValidationError("Query code must be a non-empty string")
 
+    # Substring check — only for long, unambiguous strings
     query_lower = query_code.lower()
-    for blocked in BLOCKED_OPERATIONS:
+    for blocked in BLOCKED_SUBSTRINGS:
         if blocked in query_lower:
             raise QueryValidationError(f"Blocked operation: {blocked}")
 
@@ -46,7 +58,7 @@ def validate_query(query_code: str):
         if isinstance(node, ast.ClassDef):
             raise QueryValidationError("Class definitions are not allowed")
         if isinstance(node, ast.Call):
-            if isinstance(node.func, ast.Name) and node.func.id in BLOCKED_OPERATIONS:
+            if isinstance(node.func, ast.Name) and node.func.id in BLOCKED_CALLS:
                 raise QueryValidationError(f"Blocked function call: {node.func.id}")
 
     return True
