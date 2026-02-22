@@ -100,7 +100,18 @@ def execute_query(query_code: str, df: pd.DataFrame, max_rows: int = 1000) -> di
                 'truncated': len(result) >= max_rows
             }
         elif isinstance(result, pd.Series):
-            return {'success': True, 'data': result.tolist(), 'type': 'series'}
+            # Convert to single-column DataFrame so callers always get {data, columns}
+            name = result.name if result.name is not None else 'value'
+            df_result = result.dropna().to_frame(name=name)
+            if len(df_result) > max_rows:
+                df_result = df_result.head(max_rows)
+            return {
+                'success': True,
+                'data': df_result.to_dict(orient='records'),
+                'columns': df_result.columns.tolist(),
+                'row_count': len(df_result),
+                'truncated': len(df_result) >= max_rows,
+            }
         elif isinstance(result, (list, dict, str, int, float, bool)):
             return {'success': True, 'data': result, 'type': type(result).__name__}
         else:
