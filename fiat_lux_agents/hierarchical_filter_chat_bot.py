@@ -79,6 +79,11 @@ INTENT RULES — read carefully:
   - "exclude control {name}s"
   - "keep only {name}s where max_vl > 1e5"
 
+  CRITICAL for filter_query: express ONLY what the user just asked for — never combine
+  with or reference previously applied filters. Each filter is independent. If the user
+  previously filtered to SCID and now says "only Mealey 2010", filter_query must be
+  "only Mealey 2010 data" — NOT "only SCID horses from Mealey 2010".
+
 "clear" — user wants to remove all active filters:
   - "clear filters"
   - "reset filters"
