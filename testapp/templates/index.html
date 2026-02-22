@@ -15,7 +15,7 @@
 <nav class="tabs">
   <div class="tab active" data-tab="data">Data</div>
   <div class="tab" data-tab="filter">Filter</div>
-  <div class="tab" data-tab="query">Query</div>
+  <div class="tab" data-tab="explorer">Explorer</div>
   <div class="tab" data-tab="filterchat">Filter Chat</div>
 </nav>
 
@@ -81,39 +81,9 @@
   </div>
 </div>
 
-<!-- QUERY TAB -->
-<div class="panel" id="tab-query">
-  <div class="chat-layout">
-    <div>
-      <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
-        <div class="scope-toggle">
-          <button class="query-scope-btn active" data-scope="filtered" onclick="setQueryScope('filtered')">Filtered</button>
-          <button class="query-scope-btn" data-scope="all" onclick="setQueryScope('all')">All data</button>
-        </div>
-        <span class="scope-label" id="query-scope-label">(filtered rows)</span>
-      </div>
-      <div class="messages" id="query-messages">
-        <div class="msg assistant">Ask a question about the data. I'll generate a pandas query and show the results.</div>
-      </div>
-      <div class="input-row">
-        <input type="text" id="query-input" placeholder='e.g. "total amount by category"'>
-        <button onclick="sendQuery()">Ask</button>
-      </div>
-    </div>
-    <div style="display:flex;flex-direction:column;gap:12px;">
-      <div class="sidebar-card">
-        <h3>Last generated query</h3>
-        <pre id="query-code" class="empty">None yet</pre>
-      </div>
-      <div class="sidebar-card">
-        <h3>Result data</h3>
-        <pre id="query-result" class="empty">None yet</pre>
-      </div>
-      <div class="sidebar-card">
-        <button class="btn-sm btn-danger" onclick="clearQueryHistory()">Clear history</button>
-      </div>
-    </div>
-  </div>
+<!-- EXPLORER TAB -->
+<div class="panel" id="tab-explorer">
+  {% include 'explorer_tab.html' %}
 </div>
 
 <!-- FILTER CHAT TAB -->

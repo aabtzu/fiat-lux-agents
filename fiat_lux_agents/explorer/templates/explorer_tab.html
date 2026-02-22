@@ -1,0 +1,56 @@
+{% set _cfg = explorer_config %}
+<link rel="stylesheet" href="{{ _cfg.static_url }}/explorer.css">
+
+<div class="fla-explorer">
+    <!-- Results Panel (left, wider) -->
+    <div class="fla-results" id="fla-results">
+        <div class="fla-no-results">
+            <h3>{{ _cfg.welcome_title }}</h3>
+            <p>{{ _cfg.welcome_text }}</p>
+        </div>
+    </div>
+
+    <!-- Chat Sidebar (right) -->
+    <div class="fla-sidebar">
+        <div class="fla-chat-messages" id="fla-messages">
+            {% if _cfg.example_questions %}
+            <div class="fla-examples">
+                <p class="fla-hint">Click to get started:</p>
+                {% for q in _cfg.example_questions %}
+                <button class="fla-example-btn" onclick="Explorer.ask({{ q.question | tojson }})">
+                    {{ q.label }}
+                </button>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+
+        {% if _cfg.get('show_scope_toggle', False) %}
+        <div class="fla-scope-bar">
+            <div class="fla-scope-toggle">
+                <button class="fla-scope-btn active" data-scope="filtered" onclick="Explorer.setScope('filtered')">Filtered</button>
+                <button class="fla-scope-btn" data-scope="all" onclick="Explorer.setScope('all')">All</button>
+            </div>
+            <span id="fla-scope-label" class="fla-scope-label">(using active filters)</span>
+        </div>
+        {% endif %}
+
+        <div class="fla-input-area">
+            <textarea id="fla-input" class="fla-textarea" rows="3"
+                placeholder="Ask a question... (Enter to send, Shift+Enter for new line)"></textarea>
+            <div class="fla-input-btns">
+                <button id="fla-send" class="fla-btn-send" onclick="Explorer.send()">➤</button>
+                <button id="fla-cancel" class="fla-btn-cancel" style="display:none" onclick="Explorer.cancel()">✕</button>
+            </div>
+        </div>
+
+        <div class="fla-footer">
+            <button class="fla-btn-clear" onclick="Explorer.clear()">Clear conversation</button>
+        </div>
+    </div>
+</div>
+
+<script>
+window.EXPLORER_CONFIG = {{ _cfg | tojson }};
+</script>
+<script src="{{ _cfg.static_url }}/explorer.js"></script>

@@ -13,21 +13,49 @@ import pandas as pd
 
 load_dotenv()
 
-from fiat_lux_agents import FilterBot, FilterEngine, ChatBot, FilterChatBot, execute_query, execute_fig_code
+from fiat_lux_agents import (
+    FilterBot, FilterEngine, FilterChatBot,
+    make_explorer_blueprint,
+)
 from data import SAMPLE_DATA, SCHEMA, SUMMARY
 
 app = Flask(__name__)
 
 # --- State (in-memory, single-user for testing) ---
 filter_engine = FilterEngine()
-chat_history = []
 filter_chat_history = []
 
 filter_bot = FilterBot()
-chat_bot = ChatBot(schema=SCHEMA)
 filter_chat_bot = FilterChatBot(
     dataset_description="15 sales records with fields: name, region, category, status, amount, units, month"
 )
+
+
+def _get_dataframe(scope='all', active_filters=None):
+    """Return DataFrame for the explorer — respects scope/filter state."""
+    rows = filter_engine.apply(SAMPLE_DATA) if scope == 'filtered' else SAMPLE_DATA
+    return pd.DataFrame(rows)
+
+
+def _get_summary(scope='all', active_filters=None):
+    rows = filter_engine.apply(SAMPLE_DATA) if scope == 'filtered' else SAMPLE_DATA
+    return {**SUMMARY, 'row_count': len(rows), 'scope': scope}
+
+
+explorer_bp = make_explorer_blueprint(
+    get_dataframe=_get_dataframe,
+    get_summary=_get_summary,
+    schema=SCHEMA,
+    example_questions=[
+        {'label': 'Total by category',   'question': 'What is the total amount by category?'},
+        {'label': 'Top 5 by amount',      'question': 'Who are the top 5 salespeople by amount?'},
+        {'label': 'Completed vs pending', 'question': 'How many completed vs pending sales?'},
+        {'label': 'Amount over time',     'question': 'Show total sales amount by month as a line chart'},
+    ],
+    welcome_title='Sales Data Explorer',
+    welcome_text='Ask questions about the sales data. Results and charts appear here.',
+)
+app.register_blueprint(explorer_bp, url_prefix='/explorer')
 
 
 def _data_state():
@@ -46,7 +74,7 @@ def _data_state():
 
 @app.route('/')
 def index():
-    return render_template('index.html')
+    return render_template('index.html', explorer_config=explorer_bp.explorer_config)
 
 
 # --- Data ---
@@ -95,58 +123,6 @@ def remove_filter():
 def clear_filters():
     filter_engine.clear_filters()
     return jsonify(_data_state())
-
-
-# --- Query tab ---
-
-@app.route('/api/query', methods=['POST'])
-def run_query():
-    message = request.json.get('message', '').strip()
-    if not message:
-        return jsonify({'error': 'No message provided'}), 400
-
-    scope = request.json.get('scope', 'filtered')  # 'filtered' | 'all'
-    rows = filter_engine.apply(SAMPLE_DATA) if scope == 'filtered' else SAMPLE_DATA
-    df = pd.DataFrame(rows)
-
-    result = chat_bot.process_query(message, chat_history, {**SUMMARY, 'row_count': len(rows), 'scope': scope})
-
-    if not result['success']:
-        return jsonify({'error': result['error']}), 500
-
-    response = result['response']
-    query_code = response.get('query', '')
-    query_result = execute_query(query_code, df) if query_code else {'success': True, 'data': []}
-
-    # Execute fig_code server-side if provided
-    fig_json = None
-    fig_code = response.get('fig_code')
-    if fig_code:
-        result_df = None
-        if query_result.get('success') and isinstance(query_result.get('data'), list):
-            result_df = pd.DataFrame(query_result['data'])
-        fig_result = execute_fig_code(fig_code, df, result_df)
-        if fig_result['success']:
-            fig_json = fig_result['fig_json']
-
-    chat_history.append({'role': 'user', 'content': message})
-    chat_history.append({'role': 'assistant', 'content': response.get('answer', '')})
-
-    return jsonify({
-        'answer': response.get('answer', ''),
-        'query': query_code,
-        'fig_json': fig_json,
-        'result': query_result,
-        'metadata': response.get('metadata', {}),
-        'scope': scope,
-        'row_count': len(rows)
-    })
-
-
-@app.route('/api/query/clear', methods=['POST'])
-def clear_query_history():
-    chat_history.clear()
-    return jsonify({'ok': True})
 
 
 # --- Filter Chat tab ---

@@ -1,0 +1,363 @@
+/* fiat-lux-agents Explorer component styles — scoped to .fla-explorer */
+
+.fla-explorer {
+    display: grid;
+    grid-template-columns: 3fr 1fr;
+    gap: 16px;
+    height: calc(100vh - 160px);
+    min-height: 560px;
+}
+
+/* ── Results panel (left) ─────────────────────────────────────────────────── */
+
+.fla-results {
+    background: white;
+    padding: 20px;
+    border-radius: 8px;
+    border: 1px solid #ddd;
+    overflow-y: auto;
+}
+
+.fla-no-results {
+    text-align: center;
+    padding: 60px 20px;
+    color: #666;
+}
+
+.fla-no-results h3 {
+    color: #4CAF50;
+    margin-bottom: 12px;
+    font-size: 20px;
+}
+
+.fla-answer {
+    background: #f0f8ff;
+    padding: 15px;
+    border-left: 4px solid #2196F3;
+    border-radius: 4px;
+    margin-bottom: 20px;
+    line-height: 1.6;
+    font-size: 14px;
+}
+
+.fla-chart {
+    background: white;
+    border-radius: 8px;
+    border: 1px solid #ddd;
+    padding: 10px;
+    margin-bottom: 20px;
+    min-height: 350px;
+}
+
+.fla-chart-err {
+    color: #c62828;
+    padding: 16px;
+}
+
+.fla-table-wrap {
+    margin-bottom: 20px;
+    overflow-x: auto;
+}
+
+.fla-table-wrap h3 {
+    margin: 0 0 10px 0;
+    font-size: 14px;
+    color: #333;
+}
+
+.fla-table-wrap table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+
+.fla-table-wrap th {
+    background: #4CAF50;
+    color: white;
+    padding: 9px 12px;
+    text-align: left;
+}
+
+.fla-table-wrap td {
+    padding: 7px 12px;
+    border-bottom: 1px solid #eee;
+}
+
+.fla-table-wrap tr:hover td {
+    background: #f9f9f9;
+}
+
+.fla-trunc {
+    font-size: 12px;
+    color: #888;
+    padding: 6px 0 0 0;
+}
+
+.fla-error-banner {
+    margin-top: 10px;
+    padding: 10px 14px;
+    background: #fff3e0;
+    border-left: 4px solid #ff9800;
+    border-radius: 4px;
+    font-size: 13px;
+    color: #e65100;
+}
+
+.fla-meta {
+    margin-top: 14px;
+    padding: 8px 12px;
+    background: #f9f9f9;
+    border-radius: 4px;
+    font-size: 12px;
+    color: #888;
+}
+
+.fla-loading-panel {
+    text-align: center;
+    padding: 60px 20px;
+    color: #666;
+}
+
+/* ── Sidebar (right) ──────────────────────────────────────────────────────── */
+
+.fla-sidebar {
+    display: flex;
+    flex-direction: column;
+    background: #f9f9f9;
+    border-radius: 8px;
+    border: 1px solid #ddd;
+    overflow: hidden;
+}
+
+.fla-chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 10px;
+    background: white;
+    font-size: 12px;
+}
+
+.fla-msg {
+    margin-bottom: 8px;
+    padding: 7px 9px;
+    border-radius: 6px;
+    font-size: 11px;
+    line-height: 1.4;
+    word-wrap: break-word;
+}
+
+.fla-msg-role {
+    display: block;
+    font-weight: bold;
+    font-size: 10px;
+    text-transform: uppercase;
+    margin-bottom: 3px;
+    opacity: 0.7;
+}
+
+.fla-msg-user {
+    background: #e3f2fd;
+    border-left: 3px solid #2196F3;
+}
+
+.fla-msg-assistant {
+    background: #e8f5e9;
+    border-left: 3px solid #4CAF50;
+}
+
+.fla-msg-error {
+    background: #ffebee;
+    border-left: 3px solid #f44336;
+    color: #c62828;
+}
+
+.fla-msg-loading {
+    background: #fff3e0;
+    border-left: 3px solid #ff9800;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+}
+
+/* ── Example questions ────────────────────────────────────────────────────── */
+
+.fla-examples {
+    padding: 4px 0 8px 0;
+}
+
+.fla-hint {
+    font-size: 11px;
+    color: #888;
+    margin: 0 0 6px 0;
+}
+
+.fla-example-btn {
+    display: block;
+    width: 100%;
+    padding: 8px 10px;
+    margin-bottom: 6px;
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    text-align: left;
+    cursor: pointer;
+    font-size: 12px;
+    line-height: 1.3;
+    transition: border-color 0.15s, background 0.15s;
+}
+
+.fla-example-btn:hover {
+    border-color: #4CAF50;
+    background: #f0f8ff;
+}
+
+/* ── Scope toggle ─────────────────────────────────────────────────────────── */
+
+.fla-scope-bar {
+    padding: 7px 12px;
+    border-top: 1px solid #eee;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: white;
+}
+
+.fla-scope-toggle {
+    display: inline-flex;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.fla-scope-btn {
+    padding: 3px 10px;
+    font-size: 11px;
+    background: white;
+    border: none;
+    cursor: pointer;
+    color: #666;
+}
+
+.fla-scope-btn.active {
+    background: #2c5282;
+    color: white;
+}
+
+.fla-scope-btn:not(.active):hover {
+    background: #f0f0f0;
+}
+
+.fla-scope-label {
+    font-size: 11px;
+    color: #888;
+}
+
+/* ── Input area ───────────────────────────────────────────────────────────── */
+
+.fla-input-area {
+    padding: 10px;
+    border-top: 1px solid #ddd;
+    background: white;
+    display: flex;
+    gap: 6px;
+    align-items: flex-end;
+}
+
+.fla-textarea {
+    flex: 1;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 12px;
+    resize: none;
+    font-family: inherit;
+    line-height: 1.4;
+}
+
+.fla-textarea:focus {
+    outline: none;
+    border-color: #4CAF50;
+}
+
+.fla-input-btns {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.fla-btn-send, .fla-btn-cancel {
+    width: 34px;
+    height: 34px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.fla-btn-send    { background: #4CAF50; color: white; }
+.fla-btn-send:hover { background: #43a047; }
+.fla-btn-cancel  { background: #f44336; color: white; }
+.fla-btn-cancel:hover { background: #e53935; }
+
+/* ── Footer ───────────────────────────────────────────────────────────────── */
+
+.fla-footer {
+    padding: 8px 12px;
+    border-top: 1px solid #eee;
+    background: #f9f9f9;
+}
+
+.fla-btn-clear {
+    font-size: 11px;
+    color: #999;
+    background: none;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 4px 10px;
+    cursor: pointer;
+}
+
+.fla-btn-clear:hover {
+    color: #f44336;
+    border-color: #f44336;
+}
+
+/* ── Spinner ──────────────────────────────────────────────────────────────── */
+
+.fla-spinner {
+    display: inline-block;
+    width: 11px;
+    height: 11px;
+    border: 2px solid #f3f3f3;
+    border-top-color: #ff9800;
+    border-radius: 50%;
+    animation: fla-spin 0.8s linear infinite;
+    flex-shrink: 0;
+}
+
+.fla-spinner-lg {
+    width: 36px;
+    height: 36px;
+    border-width: 4px;
+    display: block;
+    margin: 0 auto 12px;
+}
+
+@keyframes fla-spin {
+    to { transform: rotate(360deg); }
+}
+
+/* ── Responsive ───────────────────────────────────────────────────────────── */
+
+@media (max-width: 768px) {
+    .fla-explorer {
+        grid-template-columns: 1fr;
+        height: auto;
+    }
+    .fla-sidebar {
+        min-height: 300px;
+    }
+}

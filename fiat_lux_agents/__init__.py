@@ -1,4 +1,5 @@
 from .base import LLMBase, clean_json_string
+from .explorer import make_explorer_blueprint
 from .utils import diversify_sample
 from .filter_bot import FilterBot
 from .filter_engine import FilterEngine
@@ -27,4 +28,5 @@ __all__ = [
     "HierarchicalFilterChatBot",
     "SummaryBot",
     "diversify_sample",
+    "make_explorer_blueprint",
 ]

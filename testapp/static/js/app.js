@@ -1,7 +1,5 @@
 // --- State ---
 let showFilteredOut = false;
-let queryScope = 'filtered'; // 'filtered' | 'all'
-let queryCharts = []; // track all inline charts for cleanup
 
 // --- Tab switching ---
 document.querySelectorAll('.tab').forEach(tab => {
@@ -129,114 +127,6 @@ async function clearFilters() {
   applyState(await res.json());
 }
 
-// --- Chart rendering from server-generated Plotly JSON ---
-function renderFigInline(containerId, figJson) {
-  if (!figJson) return;
-
-  const wrapper = document.createElement('div');
-  wrapper.className = 'msg chart-msg';
-  wrapper.style.height = '360px';
-
-  const container = document.getElementById(containerId);
-  container.appendChild(wrapper);
-  container.scrollTop = container.scrollHeight;
-
-  try {
-    const fig = JSON.parse(figJson);
-    const layout = Object.assign({
-      height: 340,
-      margin: {t: 40, r: 20, b: 60, l: 60},
-      paper_bgcolor: 'white',
-      plot_bgcolor: '#fafafa',
-      font: {size: 11},
-    }, fig.layout || {});
-    Plotly.newPlot(wrapper, fig.data || [], layout, {responsive: false, displayModeBar: false});
-    queryCharts.push(wrapper);
-  } catch (e) {
-    console.error('Failed to render fig_json:', e);
-  }
-}
-
-// --- Query scope toggle ---
-function setQueryScope(scope) {
-  queryScope = scope;
-  document.querySelectorAll('.query-scope-btn').forEach(btn => {
-    btn.classList.toggle('active', btn.dataset.scope === scope);
-  });
-  updateScopeLabel();
-}
-
-function updateScopeLabel() {
-  const el = document.getElementById('query-scope-label');
-  if (!el) return;
-  el.textContent = queryScope === 'filtered' ? '(filtered rows)' : '(all rows)';
-}
-
-// --- Histogram bin summary for table display ---
-function formatHistogramBins(data, valueCol, nbins) {
-  const values = data.map(r => r[valueCol]).filter(v => v != null && !isNaN(v));
-  if (!values.length) return 'No data';
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  const binWidth = (max - min) / nbins;
-  const bins = Array.from({length: nbins}, (_, i) => ({
-    lo: min + i * binWidth,
-    hi: min + (i + 1) * binWidth,
-    count: 0
-  }));
-  values.forEach(v => {
-    let i = Math.floor((v - min) / binWidth);
-    if (i >= nbins) i = nbins - 1;
-    bins[i].count++;
-  });
-  const fmt = n => Number.isInteger(n) ? n.toString() : n.toFixed(2);
-  return bins
-    .filter(b => b.count > 0)
-    .map(b => `${fmt(b.lo)} – ${fmt(b.hi)}: ${b.count}`)
-    .join('\n');
-}
-
-// --- Query ---
-async function sendQuery() {
-  const input = document.getElementById('query-input');
-  const message = input.value.trim();
-  if (!message) return;
-
-  addMessage('query-messages', 'user', message);
-  addMessage('query-messages', 'assistant', '…');
-  input.value = '';
-
-  const res = await fetch('/api/query', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ message, scope: queryScope })
-  });
-  const d = await res.json();
-
-  setMessageText(document.getElementById('query-messages').lastChild, d.error || d.answer, 'assistant');
-  document.getElementById('query-code').textContent = d.query || 'No query generated';
-
-  if (d.result?.success) {
-    document.getElementById('query-result').textContent =
-      JSON.stringify(d.result.data, null, 2).slice(0, 800);
-  } else {
-    document.getElementById('query-result').textContent = d.error || '';
-  }
-  if (d.fig_json) {
-    renderFigInline('query-messages', d.fig_json);
-  }
-}
-
-async function clearQueryHistory() {
-  await fetch('/api/query/clear', { method: 'POST' });
-  queryCharts.forEach(div => { try { Plotly.purge(div); } catch (e) {} });
-  queryCharts = [];
-  document.getElementById('query-messages').innerHTML =
-    '<div class="msg assistant">Ask a question about the data.</div>';
-  document.getElementById('query-code').textContent   = 'None yet';
-  document.getElementById('query-result').textContent = 'None yet';
-}
-
 // --- Filter Chat ---
 async function sendFilterChat() {
   const input = document.getElementById('filterchat-input');
@@ -313,7 +203,6 @@ function setMessageText(el, text, role) {
 
 // Enter key support
 document.getElementById('filter-input').addEventListener('keydown',     e => { if (e.key === 'Enter') addFilter(); });
-document.getElementById('query-input').addEventListener('keydown',      e => { if (e.key === 'Enter') sendQuery(); });
 document.getElementById('filterchat-input').addEventListener('keydown', e => { if (e.key === 'Enter') sendFilterChat(); });
 
 // Initial load
