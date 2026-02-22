@@ -129,85 +129,32 @@ async function clearFilters() {
   applyState(await res.json());
 }
 
-// --- Chart rendering ---
-function renderChartInline(containerId, vizConfig, columns, data) {
-  const type = vizConfig?.type;
-  if (!type || type === 'none' || !data?.length || !columns?.length) return;
+// --- Chart rendering from server-generated Plotly JSON ---
+function renderFigInline(containerId, figJson) {
+  if (!figJson) return;
 
   const wrapper = document.createElement('div');
   wrapper.className = 'msg chart-msg';
-  wrapper.style.height = '320px';
+  wrapper.style.height = '360px';
 
   const container = document.getElementById(containerId);
   container.appendChild(wrapper);
   container.scrollTop = container.scrollHeight;
 
-  const xCol = columns[0];
-  const valueCol = columns[columns.length - 1];
-  const yCols = columns.slice(1);
-  const logY = vizConfig?.log_y || false;
-
-  const layout = {
-    height: 300,
-    margin: {t: 20, r: 10, b: 60, l: 50},
-    paper_bgcolor: 'white',
-    plot_bgcolor: '#fafafa',
-    font: {size: 11},
-    yaxis: logY ? {type: 'log'} : {},
-    xaxis: {tickangle: -35}
-  };
-
-  let traces = [];
-
-  if (type === 'histogram') {
-    traces = [{
-      type: 'histogram',
-      x: data.map(r => r[valueCol]),
-      name: valueCol,
-      marker: {color: 'rgba(26, 26, 46, 0.75)'},
-      nbinsx: vizConfig?.nbins || 10
-    }];
-    layout.xaxis = {title: valueCol};
-    layout.yaxis = {title: 'Count'};
-    layout.bargap = 0.05;
-
-  } else if (type === 'box') {
-    traces = yCols.map(col => ({
-      type: 'box', y: data.map(r => r[col]), name: col, boxpoints: 'outliers'
-    }));
-
-  } else if (type === 'scatter') {
-    const yCol = columns[1] || valueCol;
-    traces = [{
-      type: 'scatter', mode: 'markers',
-      x: data.map(r => r[xCol]), y: data.map(r => r[yCol]),
-      text: data.map(r => r[xCol]),
-      hovertemplate: '%{text}<br>x=%{x}, y=%{y}<extra></extra>',
-      marker: {color: 'rgba(26, 26, 46, 0.75)', size: 7}
-    }];
-    layout.xaxis.title = xCol;
-    layout.yaxis.title = yCol;
-
-  } else if (type === 'line') {
-    traces = yCols.map(col => ({
-      type: 'scatter', mode: 'lines+markers',
-      x: data.map(r => r[xCol]), y: data.map(r => r[col]), name: col
-    }));
-    layout.xaxis.title = xCol;
-
-  } else {
-    // bar
-    traces = yCols.map(col => ({
-      type: 'bar',
-      x: data.map(r => r[xCol]), y: data.map(r => r[col]), name: col,
-      marker: {color: 'rgba(26, 26, 46, 0.75)'}
-    }));
-    layout.xaxis.title = xCol;
+  try {
+    const fig = JSON.parse(figJson);
+    const layout = Object.assign({
+      height: 340,
+      margin: {t: 40, r: 20, b: 60, l: 60},
+      paper_bgcolor: 'white',
+      plot_bgcolor: '#fafafa',
+      font: {size: 11},
+    }, fig.layout || {});
+    Plotly.newPlot(wrapper, fig.data || [], layout, {responsive: false, displayModeBar: false});
+    queryCharts.push(wrapper);
+  } catch (e) {
+    console.error('Failed to render fig_json:', e);
   }
-
-  Plotly.newPlot(wrapper, traces, layout, {responsive: false, displayModeBar: false});
-  // Track div for cleanup on clear
-  queryCharts.push(wrapper);
 }
 
 // --- Query scope toggle ---
@@ -270,24 +217,19 @@ async function sendQuery() {
   document.getElementById('query-code').textContent = d.query || 'No query generated';
 
   if (d.result?.success) {
-    const isHistogram = d.visualization?.type === 'histogram';
-    if (isHistogram) {
-      const valueCol = d.result.columns[d.result.columns.length - 1];
-      const nbins = d.visualization?.nbins || 10;
-      document.getElementById('query-result').textContent = formatHistogramBins(d.result.data, valueCol, nbins);
-    } else {
-      document.getElementById('query-result').textContent =
-        JSON.stringify(d.result.data, null, 2).slice(0, 800);
-    }
-    renderChartInline('query-messages', d.visualization, d.result.columns, d.result.data);
+    document.getElementById('query-result').textContent =
+      JSON.stringify(d.result.data, null, 2).slice(0, 800);
   } else {
     document.getElementById('query-result').textContent = d.error || '';
+  }
+  if (d.fig_json) {
+    renderFigInline('query-messages', d.fig_json);
   }
 }
 
 async function clearQueryHistory() {
   await fetch('/api/query/clear', { method: 'POST' });
-  queryCharts.forEach(div => Plotly.purge(div));
+  queryCharts.forEach(div => { try { Plotly.purge(div); } catch (e) {} });
   queryCharts = [];
   document.getElementById('query-messages').innerHTML =
     '<div class="msg assistant">Ask a question about the data.</div>';

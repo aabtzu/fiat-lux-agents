@@ -13,7 +13,7 @@ import pandas as pd
 
 load_dotenv()
 
-from fiat_lux_agents import FilterBot, FilterEngine, ChatBot, FilterChatBot, execute_query
+from fiat_lux_agents import FilterBot, FilterEngine, ChatBot, FilterChatBot, execute_query, execute_fig_code
 from data import SAMPLE_DATA, SCHEMA, SUMMARY
 
 app = Flask(__name__)
@@ -118,13 +118,24 @@ def run_query():
     query_code = response.get('query', '')
     query_result = execute_query(query_code, df) if query_code else {'success': True, 'data': []}
 
+    # Execute fig_code server-side if provided
+    fig_json = None
+    fig_code = response.get('fig_code')
+    if fig_code:
+        result_df = None
+        if query_result.get('success') and isinstance(query_result.get('data'), list):
+            result_df = pd.DataFrame(query_result['data'])
+        fig_result = execute_fig_code(fig_code, df, result_df)
+        if fig_result['success']:
+            fig_json = fig_result['fig_json']
+
     chat_history.append({'role': 'user', 'content': message})
     chat_history.append({'role': 'assistant', 'content': response.get('answer', '')})
 
     return jsonify({
         'answer': response.get('answer', ''),
         'query': query_code,
-        'visualization': response.get('visualization', {}),
+        'fig_json': fig_json,
         'result': query_result,
         'metadata': response.get('metadata', {}),
         'scope': scope,

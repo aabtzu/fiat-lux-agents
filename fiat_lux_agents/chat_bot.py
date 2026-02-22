@@ -1,6 +1,6 @@
 """
-ChatBot - natural language queries that return a pandas query + visualization config.
-The calling app executes the query against its own DataFrame and renders the chart.
+ChatBot - natural language queries that return a pandas query + Plotly figure code.
+The calling app executes the query, then runs the fig_code server-side to produce a Plotly figure.
 """
 
 import json
@@ -14,9 +14,10 @@ class ChatBot(LLMBase):
     Answers natural language questions about tabular data by returning:
     - answer: brief text response
     - query: pandas code the app should execute (assigns to 'result')
-    - visualization: chart type config for the frontend
+    - fig_code: Plotly Python code (assigns to 'fig') or null if no chart needed
 
-    The bot does NOT execute the query or hold data — the calling app does that.
+    The bot does NOT execute any code — the calling app runs query then fig_code.
+    fig_code can use df (full DataFrame), result (from query), px, go, pd, np.
 
     Usage:
         bot = ChatBot(schema="Columns: name (str), value (float), category (str), date (str)")
@@ -45,7 +46,7 @@ CRITICAL RESPONSE FORMAT — return ONLY this JSON with exactly 3 fields:
 {{
   "answer": "Brief description like 'See chart and table below.'",
   "query": "pandas code that assigns result to the 'result' variable",
-  "visualization": {{"type": "bar|line|scatter|none"}}
+  "fig_code": "plotly python code that assigns a figure to 'fig', or null"
 }}
 
 No other fields. No markdown. ONLY the JSON object.
@@ -59,21 +60,26 @@ Answer guidelines:
 Query guidelines:
 - DataFrame is named 'df'
 - MUST assign result to variable named 'result'
-- For top N: group by the entity column first, e.g.:
-    result = df.groupby('name')['value'].max().nlargest(10).reset_index()
+- For top N: result = df.groupby('name')['value'].max().nlargest(10).reset_index()
 - For time series: filter by entity, sort by time column
 - For comparisons: groupby + agg
 
-Visualization guidelines:
-- "bar" for comparisons and rankings
-- "line" for time series
-- "scatter" for correlations
-- "histogram" for distributions of a single variable — return raw values, NOT pre-binned; default 10 bins, specify with {{"type": "histogram", "nbins": 20}} if requested
-- "box" for statistical spread (median, IQR, outliers) — return raw values per group
-- "none" for plain table results
-- For log scale: {{"type": "bar", "log_y": true}}
+Fig_code guidelines:
+- Set "fig_code" to null for plain table results with no visualization
+- Available variables: df (full DataFrame), result (from query above), px, go, pd, np
+- MUST assign a Plotly figure to a variable named 'fig'
+- Use plotly.express (px) for most charts — simpler and nicer defaults
+- Use plotly.graph_objects (go) only for multi-trace or custom charts
+- Apply good aesthetics: labels, titles, axis titles
+- For regression lines: use np.polyfit or px.scatter(trendline="ols")
+- For log axes: use log_x=True or log_y=True in px calls
+- Example bar:     fig = px.bar(result, x='category', y='value', title='Top values')
+- Example line:    fig = px.line(result, x='DPI', y='VL_log10', color='Horse_Name')
+- Example scatter: fig = px.scatter(result, x='VL_log10', y='Platelets', trendline='ols', hover_data=['Horse_Name'])
+- Example hist:    fig = px.histogram(result, x='value', nbins=20, title='Distribution')
+- Example box:     fig = px.box(result, x='group', y='value')
 
-CRITICAL: Return ONLY valid JSON with exactly 3 fields."""
+CRITICAL: Return ONLY valid JSON with exactly 3 fields. Escape newlines in fig_code as \\n."""
 
     def process_query(
         self,
@@ -90,7 +96,7 @@ CRITICAL: Return ONLY valid JSON with exactly 3 fields."""
             data_summary: Dict describing the dataset (row count, column names, etc.)
 
         Returns:
-            {"success": True, "response": {"answer", "query", "visualization", "metadata"}}
+            {"success": True, "response": {"answer", "query", "fig_code", "metadata"}}
             or {"success": False, "error": "..."}
         """
         messages = []

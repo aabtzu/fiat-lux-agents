@@ -1,9 +1,10 @@
 """
-QueryEngine - safe pandas query execution.
+QueryEngine - safe pandas query execution and Plotly figure execution.
 Validates code against a blocklist, then executes in a restricted namespace.
 """
 
 import pandas as pd
+import numpy as np
 import ast
 
 BLOCKED_OPERATIONS = {
@@ -116,6 +117,67 @@ def execute_query(query_code: str, df: pd.DataFrame, max_rows: int = 1000) -> di
             return {'success': True, 'data': result, 'type': type(result).__name__}
         else:
             return {'success': False, 'error': f'Unsupported result type: {type(result).__name__}'}
+
+    except Exception as e:
+        return {'success': False, 'error': f'Execution error: {str(e)}'}
+
+
+def execute_fig_code(fig_code: str, df: pd.DataFrame, result: pd.DataFrame = None) -> dict:
+    """
+    Execute Plotly figure code safely.
+
+    The code must assign a Plotly figure to a variable named 'fig'.
+    Available in the execution namespace: df, result, px, go, pd, np.
+
+    Args:
+        fig_code: Python code that assigns a Plotly figure to 'fig'
+        df: The full DataFrame
+        result: Optional result DataFrame from a prior execute_query call
+
+    Returns:
+        {'success': True, 'fig_json': '<plotly json string>'}
+        or {'success': False, 'error': '...'}
+    """
+    if not fig_code or not isinstance(fig_code, str):
+        return {'success': False, 'error': 'No fig_code provided'}
+
+    try:
+        validate_query(fig_code)
+    except QueryValidationError as e:
+        return {'success': False, 'error': f'Validation failed: {str(e)}'}
+
+    try:
+        import plotly.express as px
+        import plotly.graph_objects as go
+    except ImportError:
+        return {'success': False, 'error': 'plotly is not installed'}
+
+    safe_namespace = {
+        'df': df.copy(),
+        'result': result,
+        'px': px,
+        'go': go,
+        'pd': pd,
+        'np': np,
+        '__builtins__': {
+            'len': len, 'max': max, 'min': min, 'sum': sum,
+            'abs': abs, 'round': round, 'sorted': sorted,
+            'list': list, 'dict': dict, 'str': str,
+            'int': int, 'float': float, 'bool': bool,
+            'True': True, 'False': False, 'None': None,
+            'range': range, 'enumerate': enumerate, 'zip': zip,
+            'print': print,
+        }
+    }
+
+    try:
+        exec(fig_code, safe_namespace)
+        fig = safe_namespace.get('fig')
+
+        if fig is None:
+            return {'success': False, 'error': 'fig_code must assign a Plotly figure to a variable named "fig"'}
+
+        return {'success': True, 'fig_json': fig.to_json()}
 
     except Exception as e:
         return {'success': False, 'error': f'Execution error: {str(e)}'}
