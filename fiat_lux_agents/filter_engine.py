@@ -27,10 +27,13 @@ class FilterEngine:
         """
         Add a filter to the stack.
 
+        Preserves an existing 'id' if already present (allows stateless
+        round-trip from client). Assigns a new UUID otherwise.
+
         Returns:
             The filter's assigned ID
         """
-        filter_id = str(uuid.uuid4())
+        filter_id = filter_spec.get('id') or str(uuid.uuid4())
         filter_spec = {**filter_spec, 'id': filter_id}
         self.active_filters.append(filter_spec)
         return filter_id
