@@ -27,3 +27,10 @@ dev = [
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["fiat_lux_agents*"]
+
+[tool.setuptools.package-data]
+"fiat_lux_agents" = [
+    "explorer/templates/*.html",
+    "explorer/static/*.js",
+    "explorer/static/*.css",
+]
