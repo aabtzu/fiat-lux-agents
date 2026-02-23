@@ -137,25 +137,31 @@
 
         const qr = data.query_result;
         if (qr?.success && Array.isArray(qr.data) && qr.data.length) {
-            const cols = qr.columns || Object.keys(qr.data[0]);
-            html += '<div class="fla-table-wrap"><h3>Data Table</h3>';
-            html += '<table><thead><tr>';
-            cols.forEach(c => { html += `<th>${escapeHtml(c)}</th>`; });
-            html += '</tr></thead><tbody>';
-            qr.data.slice(0, 100).forEach(row => {
-                html += '<tr>';
-                cols.forEach(c => {
-                    let v = row[c];
-                    if (typeof v === 'number') v = v.toLocaleString();
-                    html += `<td>${escapeHtml(v ?? '')}</td>`;
+            // Suppress raw data tables when a chart is present — they are just noise
+            // and in scroll mode they bury previous results. Show a note instead.
+            if (chartId && qr.data.length > 20) {
+                html += `<p class="fla-trunc">Table suppressed (${qr.data.length} rows) — see chart above.</p>`;
+            } else {
+                const cols = qr.columns || Object.keys(qr.data[0]);
+                html += '<div class="fla-table-wrap"><h3>Data Table</h3>';
+                html += '<table><thead><tr>';
+                cols.forEach(c => { html += `<th>${escapeHtml(c)}</th>`; });
+                html += '</tr></thead><tbody>';
+                qr.data.slice(0, 100).forEach(row => {
+                    html += '<tr>';
+                    cols.forEach(c => {
+                        let v = row[c];
+                        if (typeof v === 'number') v = v.toLocaleString();
+                        html += `<td>${escapeHtml(v ?? '')}</td>`;
+                    });
+                    html += '</tr>';
                 });
-                html += '</tr>';
-            });
-            html += '</tbody></table>';
-            if (qr.data.length > 100) {
-                html += `<p class="fla-trunc">Showing first 100 of ${qr.data.length} rows</p>`;
+                html += '</tbody></table>';
+                if (qr.data.length > 100) {
+                    html += `<p class="fla-trunc">Showing first 100 of ${qr.data.length} rows</p>`;
+                }
+                html += '</div>';
             }
-            html += '</div>';
         }
 
         if (data.query_error) html += _errorBanner('Query error', data.query_error);

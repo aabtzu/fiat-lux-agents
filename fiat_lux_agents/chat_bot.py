@@ -64,10 +64,14 @@ Query guidelines:
 - Use scipy_stats for regression: slope, intercept, r, p, se = scipy_stats.linregress(x, y)
 - For top N: result = df.groupby('name')['value'].max().nlargest(10).reset_index()
 - For comparisons: groupby + agg
-- For histograms/distributions: query MUST be null — fig_code uses df directly.
-  NEVER set query to a non-null expression that does not assign to 'result'.
-  If query is not null, it MUST contain the pattern: result = ...
-- If a summary table is needed alongside a histogram, compute binned counts: result = df.groupby(pd.cut(df['col'], bins=N)).size().reset_index(name='count')
+- If query is not null, it MUST contain the pattern: result = ...
+- For ANY chart that uses df directly (histograms, box plots, violin plots, scatter of raw data):
+    query MUST be null. Do NOT select raw rows just to pass them to fig_code — fig_code already has df.
+    CORRECT:   {"query": null, "fig_code": "fig = px.histogram(df.dropna(subset=['col']), ...)"}
+    WRONG:     {"query": "result = df[['col','Group']].dropna()", "fig_code": "fig = px.histogram(result, ...)"}
+  The WRONG form produces a useless data table of raw rows and must never be used for charts.
+- If a summary table is needed alongside a histogram, compute binned counts only:
+    result = df.groupby(pd.cut(df['col'], bins=N)).size().reset_index(name='count')
 
 Fig_code guidelines:
 - *** ZERO import statements permitted. Not one. Not "import plotly.express as px". Nothing. ***
