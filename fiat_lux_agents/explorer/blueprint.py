@@ -78,7 +78,7 @@ def make_explorer_blueprint(
         __name__,
         template_folder='templates',
         static_folder='static',
-        static_url_path=f'{url_prefix}/static',
+        static_url_path='/static',  # Flask prepends url_prefix, so actual URL = {url_prefix}/static
         explorer_config=explorer_config,
     )
 

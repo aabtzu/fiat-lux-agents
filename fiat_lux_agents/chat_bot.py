@@ -64,12 +64,16 @@ Query guidelines:
 - Use scipy_stats for regression: slope, intercept, r, p, se = scipy_stats.linregress(x, y)
 - For top N: result = df.groupby('name')['value'].max().nlargest(10).reset_index()
 - For comparisons: groupby + agg
+- For histograms/distributions: set query to null — fig_code uses df directly. Do NOT return raw rows as result just to feed a histogram.
+- If a summary table is needed alongside a histogram, compute binned counts: result = df.groupby(pd.cut(df['col'], bins=N)).size().reset_index(name='count')
 
 Fig_code guidelines:
 - NO import statements — pre-imported: px, go, pd, np, scipy_stats (scipy.stats)
 - Set "fig_code" to null for plain table results with no visualization
-- Available variables: df (full DataFrame), result (from query above)
+- Available variables: df (full DataFrame), result (from query above, may be None if query is null)
 - MUST assign a Plotly figure to a variable named 'fig'
+- For histogram/distribution charts: use df directly — do not depend on result
+  Example hist: fig = px.histogram(df.dropna(subset=['col']), x='col', color='group', nbins=20, barmode='overlay', opacity=0.7, title='Distribution')
 - Use plotly.express (px) for most charts — simpler and nicer defaults
 - Use plotly.graph_objects (go) only for multi-trace or custom charts
 - Apply good aesthetics: labels, titles, axis titles
@@ -80,8 +84,7 @@ Fig_code guidelines:
 - Example bar:     fig = px.bar(result, x='category', y='value', title='Top values')
 - Example line:    fig = px.line(result, x='DPI', y='VL_log10', color='Horse_Name')
 - Example scatter: fig = px.scatter(result, x='VL_log10', y='Platelets', trendline='ols', hover_data=['Horse_Name'])
-- Example hist:    fig = px.histogram(result, x='value', nbins=20, title='Distribution')
-- Example box:     fig = px.box(result, x='group', y='value')
+- Example box:     fig = px.box(df, x='group', y='value')
 
 CRITICAL: Return ONLY valid JSON with exactly 3 fields. NO import statements anywhere. Escape newlines as \\n."""
 

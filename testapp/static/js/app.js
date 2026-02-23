@@ -45,7 +45,10 @@ function renderTable(id, rows) {
   tbody.innerHTML = toRender.map(r => `
     <tr class="${r._visible ? '' : 'filtered-out'}">
       <td>${r.name}</td><td>${r.region}</td><td>${r.category}</td>
-      <td>${r.status}</td><td>$${r.amount.toLocaleString()}</td><td>${r.units}</td><td>${r.month}</td>
+      <td>${r.status}</td><td>$${r.amount.toLocaleString()}</td>
+      <td>$${r.profit.toLocaleString()}</td><td>${r.margin_pct}%</td>
+      <td>${r.units}</td><td>${r.days_to_close}d</td>
+      <td>${r.rep_experience}yr</td><td>${r.customer_score}</td><td>${r.month}</td>
     </tr>`).join('');
 }
 

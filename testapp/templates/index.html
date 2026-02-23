@@ -9,7 +9,7 @@
 
 <header>
   <h1>fiat-lux-agents — test app</h1>
-  <p>Sample sales dataset · 15 records · Testing FilterBot, ChatBot, FilterChatBot, QueryEngine</p>
+  <p>Sales dataset · 60 records · 15 columns · Testing FilterBot, ChatBot, FilterChatBot, QueryEngine</p>
 </header>
 
 <nav class="tabs">
@@ -32,7 +32,8 @@
   <table id="data-table">
     <thead><tr>
       <th>Name</th><th>Region</th><th>Category</th><th>Status</th>
-      <th>Amount</th><th>Units</th><th>Month</th>
+      <th>Amount</th><th>Profit</th><th>Margin%</th>
+      <th>Units</th><th>Days Close</th><th>Exp</th><th>Score</th><th>Month</th>
     </tr></thead>
     <tbody></tbody>
   </table>
@@ -51,7 +52,8 @@
       <table id="filter-table">
         <thead><tr>
           <th>Name</th><th>Region</th><th>Category</th><th>Status</th>
-          <th>Amount</th><th>Units</th><th>Month</th>
+          <th>Amount</th><th>Profit</th><th>Margin%</th>
+          <th>Units</th><th>Days Close</th><th>Exp</th><th>Score</th><th>Month</th>
         </tr></thead>
         <tbody></tbody>
       </table>
@@ -70,10 +72,12 @@
         <div style="margin-top:16px;">
           <h3>Try these:</h3>
           <div style="display:flex;flex-direction:column;gap:4px;margin-top:6px;">
-            <button class="btn-sm" onclick="setFilter('only completed sales')">only completed sales</button>
-            <button class="btn-sm" onclick="setFilter('amount greater than 500')">amount greater than 500</button>
+            <button class="btn-sm" onclick="setFilter('only completed sales')">only completed</button>
+            <button class="btn-sm" onclick="setFilter('amount greater than 1000')">amount > 1000</button>
+            <button class="btn-sm" onclick="setFilter('margin_pct greater than 40')">margin > 40%</button>
+            <button class="btn-sm" onclick="setFilter('rep_experience at least 8 years')">experienced reps</button>
+            <button class="btn-sm" onclick="setFilter('customer_score above 8')">high satisfaction</button>
             <button class="btn-sm" onclick="setFilter('only Electronics category')">only Electronics</button>
-            <button class="btn-sm" onclick="setFilter('exclude West region')">exclude West region</button>
           </div>
         </div>
       </div>

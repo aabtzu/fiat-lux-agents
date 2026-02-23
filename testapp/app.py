@@ -27,7 +27,7 @@ filter_chat_history = []
 
 filter_bot = FilterBot()
 filter_chat_bot = FilterChatBot(
-    dataset_description="15 sales records with fields: name, region, category, status, amount, units, month"
+    dataset_description="60 sales records with fields: name, region, category, status, month, amount, units, price_per_unit, cost, profit, margin_pct, days_to_close, rep_experience, customer_score"
 )
 
 
@@ -47,10 +47,12 @@ explorer_bp = make_explorer_blueprint(
     get_summary=_get_summary,
     schema=SCHEMA,
     example_questions=[
-        {'label': 'Total by category',   'question': 'What is the total amount by category?'},
-        {'label': 'Top 5 by amount',      'question': 'Who are the top 5 salespeople by amount?'},
-        {'label': 'Completed vs pending', 'question': 'How many completed vs pending sales?'},
-        {'label': 'Amount over time',     'question': 'Show total sales amount by month as a line chart'},
+        {'label': 'Exp vs amount',        'question': 'Scatter plot of rep_experience vs amount with a regression line. What is the R²?'},
+        {'label': 'Margin by category',   'question': 'Box plot of margin_pct by category — which category has the highest median margin?'},
+        {'label': 'Days to close',        'question': 'Show average days_to_close by status as a bar chart'},
+        {'label': 'Score vs amount',      'question': 'Is there a correlation between customer_score and amount? Show a scatter plot.'},
+        {'label': 'Monthly revenue',      'question': 'Show total profit by month as a line chart'},
+        {'label': 'Top reps',             'question': 'Who are the top 5 reps by total profit? Show as a bar chart.'},
     ],
     welcome_title='Sales Data Explorer',
     welcome_text='Ask questions about the sales data. Results and charts appear here.',

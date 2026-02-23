@@ -6,6 +6,7 @@ Validates code against a blocklist, then executes in a restricted namespace.
 import pandas as pd
 import numpy as np
 import ast
+import json
 try:
     import scipy.stats as _scipy_stats
 except ImportError:
@@ -33,6 +34,11 @@ BLOCKED_OPERATIONS = BLOCKED_SUBSTRINGS | BLOCKED_CALLS
 
 class QueryValidationError(Exception):
     pass
+
+
+def _df_to_records(df: pd.DataFrame) -> list:
+    """Convert DataFrame to JSON-safe records (NaN → None)."""
+    return json.loads(df.to_json(orient='records'))
 
 
 def validate_query(query_code: str):
@@ -115,7 +121,7 @@ def execute_query(query_code: str, df: pd.DataFrame, max_rows: int = 1000) -> di
                 result = result.head(max_rows)
             return {
                 'success': True,
-                'data': result.to_dict(orient='records'),
+                'data': _df_to_records(result),
                 'columns': result.columns.tolist(),
                 'row_count': len(result),
                 'truncated': len(result) >= max_rows
@@ -128,7 +134,7 @@ def execute_query(query_code: str, df: pd.DataFrame, max_rows: int = 1000) -> di
                 df_result = df_result.head(max_rows)
             return {
                 'success': True,
-                'data': df_result.to_dict(orient='records'),
+                'data': _df_to_records(df_result),
                 'columns': df_result.columns.tolist(),
                 'row_count': len(df_result),
                 'truncated': len(df_result) >= max_rows,
