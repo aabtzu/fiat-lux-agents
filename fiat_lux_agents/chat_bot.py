@@ -67,8 +67,8 @@ Query guidelines:
 - If query is not null, it MUST contain the pattern: result = ...
 - For ANY chart that uses df directly (histograms, box plots, violin plots, scatter of raw data):
     query MUST be null. Do NOT select raw rows just to pass them to fig_code — fig_code already has df.
-    CORRECT:   {"query": null, "fig_code": "fig = px.histogram(df.dropna(subset=['col']), ...)"}
-    WRONG:     {"query": "result = df[['col','Group']].dropna()", "fig_code": "fig = px.histogram(result, ...)"}
+    CORRECT:   {{"query": null, "fig_code": "fig = px.histogram(df.dropna(subset=['col']), ...)"}}
+    WRONG:     {{"query": "result = df[['col','Group']].dropna()", "fig_code": "fig = px.histogram(result, ...)"}}
   The WRONG form produces a useless data table of raw rows and must never be used for charts.
 - If a summary table is needed alongside a histogram, compute binned counts only:
     result = df.groupby(pd.cut(df['col'], bins=N)).size().reset_index(name='count')
