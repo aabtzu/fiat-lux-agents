@@ -372,6 +372,65 @@
     opacity: 0.75;
 }
 
+/* ── Code snippet ─────────────────────────────────────────────────────────── */
+
+.fla-result-toolbar {
+    display: flex;
+    justify-content: flex-end;
+    gap: 4px;
+    padding: 4px 0 2px 0;
+}
+
+.fla-icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background: white;
+    color: #888;
+    cursor: pointer;
+    transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+
+.fla-icon-btn:hover {
+    background: #f0f0f0;
+    color: #333;
+    border-color: #bbb;
+}
+
+.fla-icon-btn.fla-icon-active {
+    background: #e8f5e9;
+    color: #2e7d32;
+    border-color: #a5d6a7;
+}
+
+.fla-icon-btn.fla-icon-flash {
+    background: #e3f2fd;
+    color: #1565c0;
+    border-color: #90caf9;
+}
+
+.fla-code-block {
+    margin-top: 6px;
+    background: #1e1e1e;
+    border-radius: 6px;
+    overflow: auto;
+    max-height: 300px;
+}
+
+.fla-code-block pre {
+    margin: 0;
+    padding: 12px 14px;
+    font-family: 'SFMono-Regular', Consolas, monospace;
+    font-size: 11px;
+    line-height: 1.5;
+    color: #d4d4d4;
+    white-space: pre;
+}
+
 /* ── Responsive ───────────────────────────────────────────────────────────── */
 
 @media (max-width: 768px) {

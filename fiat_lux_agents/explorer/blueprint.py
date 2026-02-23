@@ -157,6 +157,8 @@ def make_explorer_blueprint(
             'fig_error':    response_data.get('fig_error'),
             'query_error':  response_data.get('query_error'),
             'query_result': query_result,
+            'query_code':   response_data.get('query'),
+            'fig_code':     response_data.get('fig_code'),
             'metadata':     response_data.get('metadata'),
         })
 

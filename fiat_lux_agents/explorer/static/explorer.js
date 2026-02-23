@@ -39,6 +39,38 @@
             const input = $('fla-input');
             if (input) { input.value = question; _send(); }
         },
+
+        _toggleCode(codeId, btn) {
+            const el = $(codeId);
+            if (!el) return;
+            el.hidden = !el.hidden;
+            btn.classList.toggle('fla-icon-active', !el.hidden);
+        },
+
+        _copyCode(codeId, btn) {
+            const el = $(codeId);
+            const pre = el && el.querySelector('pre');
+            if (!pre) return;
+            navigator.clipboard.writeText(pre.textContent).then(function () {
+                btn.classList.add('fla-icon-flash');
+                setTimeout(function () { btn.classList.remove('fla-icon-flash'); }, 1200);
+            });
+        },
+
+        _copyImg: async function (chartId, btn) {
+            const div = $(chartId);
+            if (!div || typeof Plotly === 'undefined') return;
+            let dataUrl;
+            try {
+                dataUrl = await Plotly.toImage(div, { format: 'png', scale: 2 });
+                const blob = await (await fetch(dataUrl)).blob();
+                await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+                btn.classList.add('fla-icon-flash');
+                setTimeout(function () { btn.classList.remove('fla-icon-flash'); }, 1200);
+            } catch (_) {
+                if (dataUrl) window.open(dataUrl, '_blank');
+            }
+        },
     };
 
     // ── Scope toggle ─────────────────────────────────────────────────────────
@@ -170,6 +202,32 @@
         if (data.metadata) {
             const tokens = (data.metadata.input_tokens || 0) + (data.metadata.output_tokens || 0);
             html += `<div class="fla-meta">Tokens: ${tokens} | Model: ${escapeHtml(data.metadata.model)}</div>`;
+        }
+
+        // Icon toolbar: toggle code / copy code / copy chart image
+        if (data.query_code || data.fig_code || chartId) {
+            const codeId = 'fla-code-' + Date.now();
+            const ICO_CODE = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>';
+            const ICO_COPY = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
+            const ICO_IMG  = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>';
+
+            const codeBtn = (data.query_code || data.fig_code)
+                ? `<button class="fla-icon-btn" title="Show/hide code" onclick="Explorer._toggleCode('${codeId}',this)">${ICO_CODE}</button>
+                   <button class="fla-icon-btn" title="Copy code" onclick="Explorer._copyCode('${codeId}',this)">${ICO_COPY}</button>`
+                : '';
+            const imgBtn = chartId
+                ? `<button class="fla-icon-btn" title="Copy chart as image" onclick="Explorer._copyImg('${chartId}',this)">${ICO_IMG}</button>`
+                : '';
+
+            let codeLines = '';
+            if (data.query_code) codeLines += '# pandas query\n' + data.query_code;
+            if (data.query_code && data.fig_code) codeLines += '\n\n';
+            if (data.fig_code) codeLines += '# plotly figure\n' + data.fig_code;
+
+            html += `<div class="fla-result-toolbar">${codeBtn}${imgBtn}</div>`;
+            if (codeLines) {
+                html += `<div class="fla-code-block" id="${codeId}" hidden><pre>${escapeHtml(codeLines)}</pre></div>`;
+            }
         }
 
         // Prepend chart placeholder if needed
