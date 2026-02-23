@@ -40,6 +40,11 @@
             if (input) { input.value = question; _send(); }
         },
 
+        suggest(question) {
+            const input = $('fla-input');
+            if (input) { input.value = question; input.focus(); }
+        },
+
         _toggleCode(codeId, btn) {
             const el = $(codeId);
             if (!el) return;

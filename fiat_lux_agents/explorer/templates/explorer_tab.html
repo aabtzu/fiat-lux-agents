@@ -15,9 +15,9 @@
         <div class="fla-chat-messages" id="fla-messages">
             {% if _cfg.example_questions %}
             <div class="fla-examples">
-                <p class="fla-hint">Click to get started:</p>
+                <p class="fla-hint">Suggestions:</p>
                 {% for q in _cfg.example_questions %}
-                <button class="fla-example-btn" onclick="Explorer.ask({{ q.question | tojson }})">
+                <button class="fla-example-btn" onclick="Explorer.suggest({{ q.question | tojson }})">
                     {{ q.label }}
                 </button>
                 {% endfor %}
