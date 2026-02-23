@@ -34,6 +34,27 @@ class ExplorerBlueprint(Blueprint):
         self.explorer_config = explorer_config or {}
 
 
+def _build_code_snippet(preamble: Optional[str], query_code: Optional[str], fig_code: Optional[str]) -> Optional[str]:
+    """Assemble a self-contained, formatted Python snippet."""
+    if not query_code and not fig_code:
+        return None
+    parts = []
+    if preamble:
+        parts.append(preamble.strip())
+    if query_code:
+        parts.append('# pandas query\n' + query_code.strip())
+    if fig_code:
+        parts.append('# plotly figure\n' + fig_code.strip())
+        parts.append('fig.show()')
+    code = '\n\n'.join(parts)
+    try:
+        import black
+        code = black.format_str(code, mode=black.Mode())
+    except Exception:
+        pass
+    return code
+
+
 def make_explorer_blueprint(
     get_dataframe: Callable,
     schema: str,
@@ -46,6 +67,7 @@ def make_explorer_blueprint(
     show_scope_toggle: bool = False,
     default_scope: str = "all",
     results_mode: str = "single",
+    code_preamble: Optional[str] = None,
 ) -> ExplorerBlueprint:
     """
     Create a self-contained Flask Blueprint for the data explorer.
@@ -149,6 +171,12 @@ def make_explorer_blueprint(
         conversation_history.append({'role': 'user',      'content': user_message})
         conversation_history.append({'role': 'assistant', 'content': response_data['answer']})
 
+        code_snippet = _build_code_snippet(
+            code_preamble,
+            response_data.get('query'),
+            response_data.get('fig_code'),
+        )
+
         return jsonify({
             'success':      True,
             'session_id':   session_id,
@@ -157,8 +185,7 @@ def make_explorer_blueprint(
             'fig_error':    response_data.get('fig_error'),
             'query_error':  response_data.get('query_error'),
             'query_result': query_result,
-            'query_code':   response_data.get('query'),
-            'fig_code':     response_data.get('fig_code'),
+            'code_snippet': code_snippet,
             'metadata':     response_data.get('metadata'),
         })
 

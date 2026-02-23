@@ -98,6 +98,12 @@ Fig_code guidelines:
 - Example scatter: fig = px.scatter(data, x='VL_log10', y='Platelets', trendline='ols', color='SCID_Status')
 - Example box:     fig = px.box(df, x='group', y='value')
 
+Code formatting — ALWAYS write multi-line Python, never single-line:
+- Function calls with more than 2 keyword arguments MUST use one argument per line, 4-space indent
+- BAD (will be rejected):  fig = px.histogram(df, x='col', color='Group', nbins=20, barmode='overlay', opacity=0.7, title='...')
+- GOOD:  fig = px.histogram(\\n    df,\\n    x='col',\\n    color='Group',\\n    nbins=20,\\n    barmode='overlay',\\n    opacity=0.7,\\n    title='...',\\n)
+- Same rule applies to long query chains — break at each method call
+
 CRITICAL: Return ONLY valid JSON with exactly 3 fields. NO import statements anywhere in query or fig_code — they will fail. Escape newlines as \\n."""
 
     def process_query(

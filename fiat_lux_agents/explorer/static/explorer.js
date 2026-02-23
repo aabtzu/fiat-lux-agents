@@ -205,13 +205,13 @@
         }
 
         // Icon toolbar: toggle code / copy code / copy chart image
-        if (data.query_code || data.fig_code || chartId) {
+        if (data.code_snippet || chartId) {
             const codeId = 'fla-code-' + Date.now();
             const ICO_CODE = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>';
             const ICO_COPY = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
             const ICO_IMG  = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>';
 
-            const codeBtn = (data.query_code || data.fig_code)
+            const codeBtn = data.code_snippet
                 ? `<button class="fla-icon-btn" title="Show/hide code" onclick="Explorer._toggleCode('${codeId}',this)">${ICO_CODE}</button>
                    <button class="fla-icon-btn" title="Copy code" onclick="Explorer._copyCode('${codeId}',this)">${ICO_COPY}</button>`
                 : '';
@@ -219,14 +219,9 @@
                 ? `<button class="fla-icon-btn" title="Copy chart as image" onclick="Explorer._copyImg('${chartId}',this)">${ICO_IMG}</button>`
                 : '';
 
-            let codeLines = '';
-            if (data.query_code) codeLines += '# pandas query\n' + data.query_code;
-            if (data.query_code && data.fig_code) codeLines += '\n\n';
-            if (data.fig_code) codeLines += '# plotly figure\n' + data.fig_code;
-
             html += `<div class="fla-result-toolbar">${codeBtn}${imgBtn}</div>`;
-            if (codeLines) {
-                html += `<div class="fla-code-block" id="${codeId}" hidden><pre>${escapeHtml(codeLines)}</pre></div>`;
+            if (data.code_snippet) {
+                html += `<div class="fla-code-block" id="${codeId}" hidden><pre>${escapeHtml(data.code_snippet)}</pre></div>`;
             }
         }
 
