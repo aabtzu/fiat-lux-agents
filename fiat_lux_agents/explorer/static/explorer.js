@@ -17,6 +17,9 @@
     let abortCtrl      = null;
     let scope          = cfg.defaultScope || 'all';
     let pendingQuestion = '';   // used in scroll mode to label each result block
+    let inputHistory   = [];    // submitted queries, oldest first
+    let historyIdx     = -1;    // -1 = not browsing; 0..n-1 = index into history
+    let historyDraft   = '';    // saves current draft when user starts browsing
 
     // ── DOM helpers ──────────────────────────────────────────────────────────
 
@@ -97,6 +100,10 @@
         if (!message) return;
         input.value = '';
         pendingQuestion = message;
+        // Record in history (avoid consecutive duplicates)
+        if (inputHistory[inputHistory.length - 1] !== message) inputHistory.push(message);
+        historyIdx = -1;
+        historyDraft = '';
 
         _setBusy(true);
         _appendMsg('user', message);
@@ -377,7 +384,31 @@
         const input = $('fla-input');
         if (input) {
             input.addEventListener('keydown', e => {
-                if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); _send(); }
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault(); _send();
+                } else if (e.key === 'ArrowUp') {
+                    if (inputHistory.length === 0) return;
+                    e.preventDefault();
+                    if (historyIdx === -1) {
+                        historyDraft = input.value;
+                        historyIdx = inputHistory.length - 1;
+                    } else if (historyIdx > 0) {
+                        historyIdx--;
+                    }
+                    input.value = inputHistory[historyIdx];
+                    input.setSelectionRange(input.value.length, input.value.length);
+                } else if (e.key === 'ArrowDown') {
+                    if (historyIdx === -1) return;
+                    e.preventDefault();
+                    if (historyIdx < inputHistory.length - 1) {
+                        historyIdx++;
+                        input.value = inputHistory[historyIdx];
+                    } else {
+                        historyIdx = -1;
+                        input.value = historyDraft;
+                    }
+                    input.setSelectionRange(input.value.length, input.value.length);
+                }
             });
         }
         if (cfg.defaultScope) _setScope(cfg.defaultScope);
