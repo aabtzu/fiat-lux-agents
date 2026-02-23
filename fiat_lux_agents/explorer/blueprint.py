@@ -67,6 +67,7 @@ def make_explorer_blueprint(
     show_scope_toggle: bool = False,
     default_scope: str = "all",
     results_mode: str = "single",
+    show_code: bool = True,
     code_preamble: Optional[str] = None,
 ) -> ExplorerBlueprint:
     """
@@ -175,7 +176,7 @@ def make_explorer_blueprint(
             code_preamble,
             response_data.get('query'),
             response_data.get('fig_code'),
-        )
+        ) if show_code else None
 
         return jsonify({
             'success':      True,
