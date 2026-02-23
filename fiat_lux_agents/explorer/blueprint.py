@@ -123,6 +123,7 @@ def make_explorer_blueprint(
         session_id = data.get('session_id') or f"s_{datetime.utcnow().timestamp()}"
         scope = data.get('scope', 'all')
         active_filters = data.get('active_filters') or None
+        active_feature = data.get('active_feature') or None
 
         if session_id not in _sessions:
             _sessions[session_id] = []
@@ -136,6 +137,11 @@ def make_explorer_blueprint(
             if get_summary else
             {'row_count': len(df), 'columns': list(df.columns)}
         )
+
+        # Inject active_feature context so ChatBot focuses on that column
+        if active_feature:
+            summary['active_feature'] = active_feature
+            summary['focus'] = f"The user is specifically exploring the feature '{active_feature}'. Prioritise this column in your analysis."
 
         agent_response = chat_bot.process_query(
             user_message=user_message,

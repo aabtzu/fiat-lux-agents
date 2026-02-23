@@ -13,13 +13,14 @@
     const CLEAR_URL    = cfg.clear_url    || '/explorer/query/clear';
     const RESULTS_MODE = cfg.results_mode || 'single';   // 'single' | 'scroll'
 
-    let sessionId      = null;
-    let abortCtrl      = null;
-    let scope          = cfg.defaultScope || 'all';
+    let sessionId       = null;
+    let abortCtrl       = null;
+    let scope           = cfg.defaultScope || 'all';
     let pendingQuestion = '';   // used in scroll mode to label each result block
-    let inputHistory   = [];    // submitted queries, oldest first
-    let historyIdx     = -1;    // -1 = not browsing; 0..n-1 = index into history
-    let historyDraft   = '';    // saves current draft when user starts browsing
+    let inputHistory    = [];   // submitted queries, oldest first
+    let historyIdx      = -1;   // -1 = not browsing; 0..n-1 = index into history
+    let historyDraft    = '';   // saves current draft when user starts browsing
+    let activeFeature   = null; // optional feature column to focus queries on
 
     // ── DOM helpers ──────────────────────────────────────────────────────────
 
@@ -47,6 +48,9 @@
             const input = $('fla-input');
             if (input) { input.value = question; input.focus(); }
         },
+
+        setFeature(name)   { activeFeature = name || null; },
+        clearFeature()     { activeFeature = null; },
 
         _toggleCode(codeId, btn) {
             const el = $(codeId);
@@ -122,6 +126,7 @@
                     session_id: sessionId,
                     scope,
                     active_filters: activeFilters,
+                    active_feature: activeFeature,
                 }),
                 signal: abortCtrl.signal,
             });
