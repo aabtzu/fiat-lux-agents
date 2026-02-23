@@ -64,29 +64,37 @@ Query guidelines:
 - Use scipy_stats for regression: slope, intercept, r, p, se = scipy_stats.linregress(x, y)
 - For top N: result = df.groupby('name')['value'].max().nlargest(10).reset_index()
 - For comparisons: groupby + agg
-- For histograms/distributions: set query to null — fig_code uses df directly. Do NOT return raw rows as result just to feed a histogram.
+- For histograms/distributions: query MUST be null — fig_code uses df directly.
+  NEVER set query to a non-null expression that does not assign to 'result'.
+  If query is not null, it MUST contain the pattern: result = ...
 - If a summary table is needed alongside a histogram, compute binned counts: result = df.groupby(pd.cut(df['col'], bins=N)).size().reset_index(name='count')
 
 Fig_code guidelines:
-- NO import statements — pre-imported: px, go, pd, np, scipy_stats (scipy.stats)
+- *** ZERO import statements permitted. Not one. Not "import plotly.express as px". Nothing. ***
+  The execution namespace already contains: px, go, pd, np, scipy_stats.
+  Writing any import line will cause a hard validation error.
+  BAD (causes error): import plotly.express as px  /  import numpy as np  /  from scipy import stats
+  GOOD: px.histogram(...)  /  np.mean(...)  /  scipy_stats.mannwhitneyu(...)
+- Pre-imported names: px, go, pd, np, scipy_stats (this IS scipy.stats — use scipy_stats.linregress etc.)
 - Set "fig_code" to null for plain table results with no visualization
 - Available variables: df (full DataFrame), result (from query above, may be None if query is null)
 - MUST assign a Plotly figure to a variable named 'fig'
+- Always regenerate the full chart from scratch — there is no existing figure to modify
 - For histogram/distribution charts: use df directly — do not depend on result
   Example hist: fig = px.histogram(df.dropna(subset=['col']), x='col', color='group', nbins=20, barmode='overlay', opacity=0.7, title='Distribution')
 - Use plotly.express (px) for most charts — simpler and nicer defaults
 - Use plotly.graph_objects (go) only for multi-trace or custom charts
 - Apply good aesthetics: labels, titles, axis titles
-- For scatter with regression + R²: use px.scatter(trendline='ols') and put R² in title or annotation
-  Example: r_val = scipy_stats.linregress(data['x'], data['y']); r2 = r_val.rvalue**2
-  Then: title=f'Y vs X<br><sup>R² = {{r2:.3f}}, p = {{r_val.pvalue:.4f}}</sup>'
+- For scatter with regression trendline: use trendline='ols' (statsmodels handles it internally, no import needed)
+  Also compute R² manually to show in title: r_val = scipy_stats.linregress(data['x'].values, data['y'].values); r2 = r_val.rvalue**2
+  title=f'Y vs X<br><sup>R² = {{r2:.3f}}, p = {{r_val.pvalue:.4f}}</sup>'
 - For log axes: use log_x=True or log_y=True in px calls
 - Example bar:     fig = px.bar(result, x='category', y='value', title='Top values')
 - Example line:    fig = px.line(result, x='DPI', y='VL_log10', color='Horse_Name')
-- Example scatter: fig = px.scatter(result, x='VL_log10', y='Platelets', trendline='ols', hover_data=['Horse_Name'])
+- Example scatter: fig = px.scatter(data, x='VL_log10', y='Platelets', trendline='ols', color='SCID_Status')
 - Example box:     fig = px.box(df, x='group', y='value')
 
-CRITICAL: Return ONLY valid JSON with exactly 3 fields. NO import statements anywhere. Escape newlines as \\n."""
+CRITICAL: Return ONLY valid JSON with exactly 3 fields. NO import statements anywhere in query or fig_code — they will fail. Escape newlines as \\n."""
 
     def process_query(
         self,

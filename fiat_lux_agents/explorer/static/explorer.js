@@ -3,17 +3,20 @@
  *
  * Configured via window.EXPLORER_CONFIG (set by explorer_tab.html):
  *   queryUrl, clearUrl, welcomeTitle, welcomeText,
- *   show_scope_toggle (bool), defaultScope ('all'|'filtered')
+ *   show_scope_toggle (bool), defaultScope ('all'|'filtered'),
+ *   results_mode ('single'|'scroll')
  */
 
 (function () {
     const cfg = window.EXPLORER_CONFIG || {};
-    const QUERY_URL = cfg.query_url || '/explorer/query';
-    const CLEAR_URL = cfg.clear_url || '/explorer/query/clear';
+    const QUERY_URL    = cfg.query_url    || '/explorer/query';
+    const CLEAR_URL    = cfg.clear_url    || '/explorer/query/clear';
+    const RESULTS_MODE = cfg.results_mode || 'single';   // 'single' | 'scroll'
 
-    let sessionId = null;
-    let abortCtrl = null;
-    let scope = cfg.defaultScope || 'all';
+    let sessionId      = null;
+    let abortCtrl      = null;
+    let scope          = cfg.defaultScope || 'all';
+    let pendingQuestion = '';   // used in scroll mode to label each result block
 
     // ── DOM helpers ──────────────────────────────────────────────────────────
 
@@ -28,11 +31,11 @@
     // ── Public API (called from inline onclick) ───────────────────────────────
 
     window.Explorer = {
-        send() { _send(); },
-        cancel() { if (abortCtrl) { abortCtrl.abort(); abortCtrl = null; } },
-        clear() { _clear(); },
-        setScope(s) { _setScope(s); },
-        ask(question) {
+        send()         { _send(); },
+        cancel()       { if (abortCtrl) { abortCtrl.abort(); abortCtrl = null; } },
+        clear()        { _clear(); },
+        setScope(s)    { _setScope(s); },
+        ask(question)  {
             const input = $('fla-input');
             if (input) { input.value = question; _send(); }
         },
@@ -56,12 +59,12 @@
         const message = input ? input.value.trim() : '';
         if (!message) return;
         input.value = '';
+        pendingQuestion = message;
 
         _setBusy(true);
         _appendMsg('user', message);
         const loadId = _appendLoading();
 
-        // Collect active_filters if the host exposes them
         const activeFilters = (typeof globalFilterState !== 'undefined')
             ? (globalFilterState.activeFilters || []) : [];
 
@@ -84,6 +87,7 @@
 
             if (!data.success) {
                 _appendMsg('error', data.error || 'An error occurred');
+                _clearLoadingBlock();
             } else {
                 sessionId = data.session_id;
                 _renderResult(data);
@@ -91,6 +95,7 @@
             }
         } catch (err) {
             _removeLoading(loadId);
+            _clearLoadingBlock();
             _appendMsg('error', err.name === 'AbortError' ? 'Request cancelled' : 'Request failed: ' + err.message);
         }
 
@@ -113,6 +118,10 @@
         }
         const msgs = $('fla-messages');
         if (msgs) msgs.innerHTML = '';
+        _showWelcome();
+    }
+
+    function _showWelcome() {
         const results = $('fla-results');
         if (results) results.innerHTML = `
             <div class="fla-no-results">
@@ -121,15 +130,11 @@
             </div>`;
     }
 
-    // ── Render result in left panel ───────────────────────────────────────────
+    // ── Build result HTML (shared between modes) ──────────────────────────────
 
-    function _renderResult(data) {
-        const results = $('fla-results');
-        if (!results) return;
-
+    function _buildResultHtml(data, chartId) {
         let html = `<div class="fla-answer">${escapeHtml(data.answer)}</div>`;
 
-        // Table
         const qr = data.query_result;
         if (qr?.success && Array.isArray(qr.data) && qr.data.length) {
             const cols = qr.columns || Object.keys(qr.data[0]);
@@ -153,45 +158,84 @@
             html += '</div>';
         }
 
-        // Errors
         if (data.query_error) html += _errorBanner('Query error', data.query_error);
         if (data.fig_error)   html += _errorBanner('Chart error', data.fig_error);
 
-        // Metadata
         if (data.metadata) {
             const tokens = (data.metadata.input_tokens || 0) + (data.metadata.output_tokens || 0);
             html += `<div class="fla-meta">Tokens: ${tokens} | Model: ${escapeHtml(data.metadata.model)}</div>`;
         }
 
-        if (data.fig_json) {
-            const chartId = 'fla-chart-' + Date.now();
-            results.innerHTML = html.replace(
-                '<div class="fla-answer">',
-                `<div class="fla-chart" id="${chartId}"></div><div class="fla-answer">`
-            );
-            setTimeout(() => {
-                const div = $(chartId);
-                if (!div) return;
-                try {
-                    const fig = JSON.parse(data.fig_json);
-                    const layout = Object.assign({
-                        margin: { t: 50, r: 20, b: 60, l: 60 },
-                        paper_bgcolor: 'white',
-                        plot_bgcolor: '#fafafa',
-                        font: { size: 12 },
-                    }, fig.layout || {});
-                    Plotly.newPlot(div, fig.data || [], layout, { responsive: true, displayModeBar: false });
-                } catch (e) {
-                    div.innerHTML = `<p class="fla-chart-err">Chart render error: ${escapeHtml(e.message)}</p>`;
-                }
-            }, 50);
+        // Prepend chart placeholder if needed
+        if (chartId) {
+            html = `<div class="fla-chart" id="${chartId}"></div>` + html;
+        }
+
+        return html;
+    }
+
+    function _renderChart(chartId, fig_json) {
+        if (!chartId || !fig_json) return;
+        setTimeout(() => {
+            const div = $(chartId);
+            if (!div) return;
+            try {
+                const fig = JSON.parse(fig_json);
+                const layout = Object.assign({
+                    margin: { t: 50, r: 20, b: 60, l: 60 },
+                    paper_bgcolor: 'white',
+                    plot_bgcolor: '#fafafa',
+                    font: { size: 12 },
+                }, fig.layout || {});
+                Plotly.newPlot(div, fig.data || [], layout, { responsive: true, displayModeBar: false });
+            } catch (e) {
+                div.innerHTML = `<p class="fla-chart-err">Chart render error: ${escapeHtml(e.message)}</p>`;
+            }
+        }, 50);
+    }
+
+    // ── Render result ─────────────────────────────────────────────────────────
+
+    function _renderResult(data) {
+        const results = $('fla-results');
+        if (!results) return;
+
+        const chartId = data.fig_json ? ('fla-chart-' + Date.now()) : null;
+        const html = _buildResultHtml(data, chartId);
+
+        if (RESULTS_MODE === 'scroll') {
+            // Build a result block and replace the loading placeholder
+            const block = document.createElement('div');
+            block.className = 'fla-result-block';
+            block.innerHTML =
+                `<div class="fla-result-q">${escapeHtml(pendingQuestion)}</div>` + html;
+
+            const loader = results.querySelector('.fla-result-loading');
+            if (loader) loader.replaceWith(block);
+            else results.appendChild(block);
+
+            results.scrollTop = results.scrollHeight;
         } else {
+            // Single-pane: replace entire results panel
             results.innerHTML = html;
         }
+
+        _renderChart(chartId, data.fig_json);
     }
 
     function _errorBanner(label, msg) {
         return `<div class="fla-error-banner"><strong>${escapeHtml(label)}:</strong> ${escapeHtml(msg)}</div>`;
+    }
+
+    function _clearLoadingBlock() {
+        const results = $('fla-results');
+        if (!results) return;
+        const loader = results.querySelector('.fla-result-loading');
+        if (loader) loader.remove();
+        // If scroll mode and now empty, show welcome
+        if (RESULTS_MODE === 'scroll' && !results.querySelector('.fla-result-block')) {
+            _showWelcome();
+        }
     }
 
     // ── Chat sidebar messages ─────────────────────────────────────────────────
@@ -221,11 +265,31 @@
         msgs.scrollTop = msgs.scrollHeight;
 
         const results = $('fla-results');
-        if (results) results.innerHTML = `
-            <div class="fla-loading-panel">
-                <span class="fla-spinner fla-spinner-lg"></span>
-                <p>Processing your question…</p>
-            </div>`;
+        if (results) {
+            if (RESULTS_MODE === 'scroll') {
+                // Remove welcome message on first query
+                const welcome = results.querySelector('.fla-no-results');
+                if (welcome) welcome.remove();
+                // Append a loading block at the bottom
+                const block = document.createElement('div');
+                block.className = 'fla-result-block fla-result-loading';
+                block.innerHTML = `
+                    <div class="fla-result-q">${escapeHtml(pendingQuestion)}</div>
+                    <div class="fla-loading-panel">
+                        <span class="fla-spinner fla-spinner-lg"></span>
+                        <p>Processing…</p>
+                    </div>`;
+                results.appendChild(block);
+                results.scrollTop = results.scrollHeight;
+            } else {
+                results.innerHTML = `
+                    <div class="fla-loading-panel">
+                        <span class="fla-spinner fla-spinner-lg"></span>
+                        <p>Processing your question…</p>
+                    </div>`;
+            }
+        }
+
         return id;
     }
 
@@ -252,7 +316,6 @@
                 if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); _send(); }
             });
         }
-        // Set initial scope based on config
         if (cfg.defaultScope) _setScope(cfg.defaultScope);
     });
 
