@@ -10,29 +10,25 @@ Reusable Python bots for natural language data exploration. Drop them into any F
 
 Your users talk to their data. The bots handle the rest.
 
-```
- You    ▸  only show completed sales after March
- Bot    ▸  Filter added: completed sales after March — 6 of 15 items remaining.
+The `make_explorer_blueprint` function gives you a complete chat-driven data explorer as a drop-in Flask blueprint. Wire it to your data and you get this:
 
- You    ▸  what's the average amount for those?
- Bot    ▸  The average sale amount is $1,035 across the 6 filtered records.
+**Welcome state** — suggestion buttons pre-populate common questions for your dataset:
 
- You    ▸  show me a breakdown by category
- Bot    ▸  See chart below.
-           ┌─────────────────────────────────┐
-           │  Electronics  ████████████ $4.2k │
-           │  Clothing     ██████       $1.5k │
-           │  Food         ███          $0.5k │
-           └─────────────────────────────────┘
+![Explorer welcome state](docs/screenshots/01_explorer_welcome.png)
 
- You    ▸  now exclude Electronics
- Bot    ▸  Filter added: exclude Electronics — 3 of 15 items remaining.
+**Ask a question** — type freely or click a suggestion:
 
- You    ▸  clear filters
- Bot    ▸  All filters cleared.
-```
+![Query typed in explorer](docs/screenshots/02_explorer_query_typed.png)
 
-All of that — filter creation, data questions, chart generation, filter chaining — is handled by a small set of focused bots you can drop into any app.
+**Chart + table** — the bot writes and runs pandas code, renders the chart, and shows the underlying data:
+
+![Line chart result with data table](docs/screenshots/03_explorer_chart_result.png)
+
+**Conversation** — follow-up questions build on the history; the sidebar shows the full exchange:
+
+![Second query showing bar chart and conversation history](docs/screenshots/04_explorer_second_query.png)
+
+All of that — chart generation, pandas code execution, conversation history, suggestion buttons — comes from `make_explorer_blueprint`. You supply a function that returns a DataFrame; it handles the rest.
 
 ---
 
