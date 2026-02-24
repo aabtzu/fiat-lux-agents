@@ -12,15 +12,11 @@ Your users talk to their data. The bots handle the rest.
 
 The `make_explorer_blueprint` function gives you a complete chat-driven data explorer as a drop-in Flask blueprint. Wire it to your data and you get this:
 
-**Welcome state** — suggestion buttons pre-populate common questions for your dataset:
+**Your data, as a table** — the Data tab shows all rows and live filter state:
 
-![Explorer welcome state](docs/screenshots/01_explorer_welcome.png)
+![Data tab showing sales table](docs/screenshots/01_data_tab.png)
 
 **Ask a question** — type freely or click a suggestion:
-
-![Query typed in explorer](docs/screenshots/02_explorer_query_typed.png)
-
-**Chart + table** — the bot writes and runs pandas code, renders the chart, and shows the underlying data:
 
 ![Line chart result with data table](docs/screenshots/03_explorer_chart_result.png)
 
