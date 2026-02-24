@@ -41,6 +41,21 @@ def _df_to_records(df: pd.DataFrame) -> list:
     return json.loads(df.to_json(orient='records'))
 
 
+def _strip_imports(code: str) -> str:
+    """Remove import lines from LLM-generated code.
+
+    The execution namespace already has pd, np, px, go, scipy_stats pre-loaded,
+    so import lines are redundant and only cause validation failures.
+    """
+    clean = []
+    for line in code.splitlines():
+        stripped = line.lstrip()
+        if stripped.startswith('import ') or stripped.startswith('from ') and ' import ' in stripped:
+            continue
+        clean.append(line)
+    return '\n'.join(clean)
+
+
 def validate_query(query_code: str):
     """
     Validate that query code only uses safe operations.
@@ -88,6 +103,7 @@ def execute_query(query_code: str, df: pd.DataFrame, max_rows: int = 1000) -> di
     Returns:
         dict with 'success', 'data', and optionally 'error', 'columns', 'row_count'
     """
+    query_code = _strip_imports(query_code)
     try:
         validate_query(query_code)
     except QueryValidationError as e:
@@ -167,6 +183,7 @@ def execute_fig_code(fig_code: str, df: pd.DataFrame, result: pd.DataFrame = Non
     if not fig_code or not isinstance(fig_code, str):
         return {'success': False, 'error': 'No fig_code provided'}
 
+    fig_code = _strip_imports(fig_code)
     try:
         validate_query(fig_code)
     except QueryValidationError as e:
