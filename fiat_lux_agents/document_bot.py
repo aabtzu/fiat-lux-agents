@@ -108,20 +108,21 @@ HTML RULES:
 10. Always include a title/header in the visualization
 11. Use relative units (rem, %, etc.) so it scales well
 
-DATA-DRIVEN APPROACH (critical for large documents):
-- Define data as a JavaScript array/object, then render it dynamically
+DATA-DRIVEN APPROACH (critical — always do this):
+- ALWAYS store the raw records as `window.DOCUMENT_DATA` at the very top of your <script> tag.
+  This name is required — the app extracts it to generate charts without re-reading the document.
 - Example:
   <script>
-    const data = [
+    window.DOCUMENT_DATA = [
       {{date: "2025-01-01", description: "Item 1", amount: 100}},
     ];
     function render() {{
       document.getElementById('body').innerHTML =
-        data.map(r => `<tr><td>${{r.date}}</td><td>${{r.description}}</td><td>$${{r.amount}}</td></tr>`).join('');
+        window.DOCUMENT_DATA.map(r => `<tr><td>${{r.date}}</td><td>${{r.description}}</td><td>$${{r.amount}}</td></tr>`).join('');
     }}
     document.addEventListener('DOMContentLoaded', render);
   </script>
-- Keeps HTML compact regardless of data size; makes sorting/filtering easy
+- Keeps HTML compact regardless of data size; enables fast chart additions later
 
 JAVASCRIPT RULES:
 - Prefer CSS-only solutions (hover, :target, details/summary) over JS when possible
@@ -242,6 +243,78 @@ ANSWER STYLE:
             }
         ]
         return self._call_and_parse(self._REFINE_SYSTEM_PROMPT, messages)
+
+    _CHART_ONLY_PROMPT = f"""You are a data visualization expert. Generate ONLY a self-contained chart component to be appended to an existing page.
+
+The calling app will inject your output inside an existing HTML page that already has:
+  window.DOCUMENT_DATA = [ ... ];   ← the raw records
+
+RESPONSE FORMAT:
+Write a 1-sentence description of the chart, then output ONLY the chart component after "{HTML_MARKER}"
+
+RULES:
+- Output ONLY the chart component — a container div + canvas + script. NOT a full HTML page.
+- Load Chart.js from CDN at the top: <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+- Use window.DOCUMENT_DATA to compute aggregations in JavaScript (group by month, sum, count, etc.)
+- Use a descriptive canvas id (e.g. id="chart-monthly-amount")
+- Style the container with inline styles; match a clean, modern look
+- Do not redefine window.DOCUMENT_DATA — it already exists on the page
+
+Example output:
+Added a bar chart grouping session amounts by month.
+{HTML_MARKER}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+<div style="margin: 2rem 1rem; padding: 1rem; background:#fff; border-radius:8px; box-shadow:0 1px 4px rgba(0,0,0,.08);">
+  <h3 style="margin:0 0 1rem; font-size:1rem; color:#374151;">Amount by Month</h3>
+  <canvas id="chart-monthly-amount"></canvas>
+  <script>
+    (function() {{
+      const byMonth = {{}};
+      window.DOCUMENT_DATA.forEach(r => {{
+        const m = r.date.slice(0, 7);
+        byMonth[m] = (byMonth[m] || 0) + r.amount;
+      }});
+      new Chart(document.getElementById('chart-monthly-amount'), {{
+        type: 'bar',
+        data: {{
+          labels: Object.keys(byMonth),
+          datasets: [{{ label: 'Amount ($)', data: Object.values(byMonth), backgroundColor: '#6c63ff' }}]
+        }},
+        options: {{ responsive: true, plugins: {{ legend: {{ display: false }} }} }}
+      }});
+    }})();
+  </script>
+</div>"""
+
+    def generate_chart_append(self, document_data_json: str, request: str) -> Dict:
+        """
+        Generate a chart component from extracted window.DOCUMENT_DATA JSON.
+
+        Much faster than refine() for chart requests because:
+        - Input: compact JSON (~1 KB) instead of full HTML (~20 KB)
+        - Output: only the chart component (~30 lines) instead of the full page
+
+        The returned html should be injected into the existing visualization (before </body>).
+
+        Args:
+            document_data_json: The JSON string extracted from window.DOCUMENT_DATA.
+            request:            The user's chart request.
+
+        Returns:
+            {{"message": str, "html": str | None}}
+            html is the chart component only — NOT a full HTML document.
+        """
+        messages = [
+            {
+                "role": "user",
+                "content": (
+                    f"window.DOCUMENT_DATA is already defined on the page with this data:\n\n"
+                    f"{document_data_json}\n\n"
+                    f"Request: {request}"
+                ),
+            }
+        ]
+        return self._call_and_parse(self._CHART_ONLY_PROMPT, messages)
 
     def _call_and_parse(self, system_prompt: str, messages: list) -> Dict:
         """Call the API and parse the ---HTML--- delimited response."""
