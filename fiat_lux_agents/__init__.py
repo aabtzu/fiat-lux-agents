@@ -12,6 +12,7 @@ from .hierarchical_filter_engine import HierarchicalFilterEngine
 from .hierarchical_filter_chat_bot import HierarchicalFilterChatBot
 from .summary_bot import SummaryBot
 from .knowledge_bot import KnowledgeBot
+from .document_bot import DocumentBot
 
 __all__ = [
     "LLMBase",
@@ -29,6 +30,7 @@ __all__ = [
     "HierarchicalFilterChatBot",
     "SummaryBot",
     "KnowledgeBot",
+    "DocumentBot",
     "diversify_sample",
     "make_explorer_blueprint",
 ]
