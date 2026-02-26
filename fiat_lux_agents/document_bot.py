@@ -314,7 +314,27 @@ Added a bar chart grouping session amounts by month.
                 ),
             }
         ]
-        return self._call_and_parse(self._CHART_ONLY_PROMPT, messages)
+        # Use Haiku — chart generation is a simple coding task, no need for Sonnet
+        try:
+            response_text = self.client.messages.create(
+                model="claude-haiku-4-5-20251001",
+                max_tokens=4096,
+                system=self._CHART_ONLY_PROMPT,
+                messages=messages,
+            ).content[0].text
+        except Exception as e:
+            return {"message": f"I couldn't generate the chart: {str(e)}", "html": None}
+
+        marker_index = response_text.find(HTML_MARKER)
+        if marker_index == -1:
+            return {"message": response_text.strip(), "html": None}
+        message = response_text[:marker_index].strip()
+        html = response_text[marker_index + len(HTML_MARKER):].strip()
+        if html.startswith("```"):
+            html = html.split("\n", 1)[-1]
+        if html.endswith("```"):
+            html = html.rsplit("```", 1)[0]
+        return {"message": message, "html": html.strip()}
 
     def _call_and_parse(self, system_prompt: str, messages: list) -> Dict:
         """Call the API and parse the ---HTML--- delimited response."""
