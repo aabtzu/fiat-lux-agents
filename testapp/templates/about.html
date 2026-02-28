@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>About — fiat-lux-agents</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+  <style>
+    .about-body { max-width: 860px; margin: 40px auto; padding: 0 24px 60px; }
+
+    .about-body h1 { font-size: 26px; font-weight: 700; margin-bottom: 6px; }
+    .about-body h2 { font-size: 18px; font-weight: 600; margin: 36px 0 12px; padding-bottom: 6px; border-bottom: 1px solid #e0e0e0; }
+    .about-body h3 { font-size: 15px; font-weight: 600; margin: 28px 0 8px; color: #1a1a2e; }
+    .about-body p  { font-size: 14px; line-height: 1.7; color: #444; margin-bottom: 12px; }
+    .about-body ul, .about-body ol { font-size: 14px; line-height: 1.7; color: #444; padding-left: 20px; margin-bottom: 12px; }
+    .about-body li { margin-bottom: 4px; }
+
+    .about-body table { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 20px; }
+    .about-body th { background: #1a1a2e; color: #fff; padding: 8px 14px; text-align: left; }
+    .about-body td { padding: 7px 14px; border-bottom: 1px solid #eee; vertical-align: top; }
+    .about-body tr:hover td { background: #f9f9f9; }
+
+    .about-body pre { background: #f4f4f8; border: 1px solid #e0e0e0; border-radius: 6px; padding: 14px 16px; overflow-x: auto; margin-bottom: 16px; }
+    .about-body code { font-family: 'Menlo', 'Consolas', monospace; font-size: 12.5px; }
+    .about-body p code, .about-body li code { background: #f0f0f5; padding: 1px 5px; border-radius: 3px; }
+
+    .about-body hr { border: none; border-top: 1px solid #e8e8e8; margin: 28px 0; }
+    .about-body a { color: #1a1a2e; text-decoration: underline; }
+    .about-body a:hover { color: #444; }
+
+    .about-body blockquote { border-left: 3px solid #1a1a2e; margin: 0 0 12px; padding: 4px 16px; color: #666; font-style: italic; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div style="display:flex;align-items:center;justify-content:space-between">
+    <div>
+      <h1>fiat-lux-agents</h1>
+      <p>Agent reference</p>
+    </div>
+    <a href="/" style="color:#aaa;font-size:13px;text-decoration:none" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='#aaa'">← test app</a>
+  </div>
+</header>
+
+<div class="about-body">
+  {{ content | safe }}
+</div>
+
+</body>
+</html>

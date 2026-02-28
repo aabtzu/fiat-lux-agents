@@ -7,6 +7,7 @@ import sys
 import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
+import markdown
 from flask import Flask, request, jsonify, render_template
 from dotenv import load_dotenv
 import pandas as pd
@@ -176,6 +177,15 @@ def filter_chat():
 def clear_filter_chat():
     filter_chat_history.clear()
     return jsonify({'ok': True})
+
+
+@app.route('/about')
+def about():
+    readme_path = os.path.join(os.path.dirname(__file__), '..', 'README.md')
+    with open(readme_path, 'r') as f:
+        content = f.read()
+    html = markdown.markdown(content, extensions=['tables', 'fenced_code'])
+    return render_template('about.html', content=html)
 
 
 if __name__ == '__main__':
