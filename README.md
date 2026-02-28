@@ -30,6 +30,24 @@ All of that — chart generation, pandas code execution, conversation history, s
 
 ## Bots
 
+| Bot | Description |
+|---|---|
+| [FilterBot](#filterbot) | Translates natural language into a structured filter spec for flat list-of-dicts data |
+| [FilterEngine](#filterengine) | Executes filter specs against any list of dicts; maintains a toggleable filter stack |
+| [FilterChatBot](#filterchatbot) | Conversation thread that routes messages to filter, question, or clear handlers |
+| [HierarchicalFilterBot](#hierarchicalfilterbot) | Like FilterBot but for entities with nested child arrays |
+| [HierarchicalFilterEngine](#hierarchicalfilterengine) | Like FilterEngine for hierarchical data; adds `enrich()` to precompute aggregates |
+| [HierarchicalFilterChatBot](#hierarchicalfilterchatbot) | Like FilterChatBot but for hierarchical entity data |
+| [ChatBot](#chatbot) | Generates pandas query code and a chart config from a natural language question |
+| [SummaryBot](#summarybot) | Answers plain-text questions about a dataset — no code, no charts |
+| [QueryEngine](#queryengine) | Safely validates and executes LLM-generated pandas code using AST parsing |
+| [DocumentBot](#documentbot) | Generates HTML visualizations or answers questions from raw unstructured document text |
+| [KnowledgeBot](#knowledgebot) | Answers questions from a curated domain knowledge base; returns markdown |
+| [WebSearchBot](#websearchbot) | Searches the web or fetches a URL using Anthropic's built-in tools |
+| [ChartDigitizerBot](#chartdigitizerbot) | Extracts data series from chart images with iterative self-correction |
+
+---
+
 ### FilterBot
 Translates natural language into structured filter specs for flat list-of-dicts data.
 
@@ -195,6 +213,101 @@ Blocks: imports, exec, eval, file I/O, os/sys access, function/class definitions
 
 ---
 
+### DocumentBot
+Generates self-contained HTML visualizations and answers questions from unstructured document text. Unlike `ChatBot` (which requires a DataFrame), `DocumentBot` reads raw text and outputs HTML — no parsing step or schema required. Designed for invoices, schedules, healthcare bills, contracts, and any document without a fixed schema.
+
+```python
+from fiat_lux_agents import DocumentBot
+
+bot = DocumentBot()
+
+# Initial visualization
+result = bot.process(document_text, request="Show as a weekly calendar")
+if result["html"]:
+    # insert result["html"] into a div
+else:
+    print(result["message"])  # text answer, no viz change
+
+# Follow-up styling (cheaper — no document resent)
+result = bot.refine(result["html"], request="Make the header blue")
+
+# Multi-document
+result = bot.process(["January...", "February..."], request="Combine into one view")
+```
+
+Two methods:
+- `process()` — sends full document context; use for initial visualization or questions that need the original document
+- `refine()` — sends only the current HTML; faster and cheaper for layout/styling follow-ups
+
+---
+
+### KnowledgeBot
+Answers research questions from a curated domain knowledge base. Inject papers, manuals, or domain notes as a text string, and the bot answers from that content rather than from general training knowledge. Returns markdown-formatted responses.
+
+```python
+from fiat_lux_agents import KnowledgeBot
+
+bot = KnowledgeBot(knowledge=MY_KNOWLEDGE_TEXT)
+answer = bot.answer("What are the candidate ODE models?")
+
+# Narrow focus per page in multi-page apps
+interp_bot = bot.with_page_context("Focus on platelet interpolation methods.")
+answer = interp_bot.answer("Why is linear interpolation used?", history=prior_turns)
+```
+
+- Never invents information not present in the knowledge base
+- Supports multi-turn conversation history (last 6 turns)
+- `with_page_context()` returns a new bot sharing the same knowledge base — useful for per-page specialization without duplicating text
+
+---
+
+### WebSearchBot
+Answers questions that require live internet access. Uses Anthropic's built-in server-side web search and fetch tools — no external API keys required.
+
+```python
+from fiat_lux_agents import WebSearchBot
+
+bot = WebSearchBot()
+
+# Search the web
+answer = bot.search("current price of AAPL stock")
+
+# Fetch and summarize a specific URL
+answer = bot.fetch("https://example.com/product", question="What is the price?")
+```
+
+- `search()` — takes a query, searches, and returns a plain-text answer with URLs
+- `fetch()` — fetches a specific URL and answers a question about it
+
+---
+
+### ChartDigitizerBot
+Self-correcting scientific chart digitizer. Extracts numerical data series from chart images using a multi-pass feedback loop: extracts data, renders a comparison overlay, then asks Claude to fix gaps and missed peaks — repeating until the result stabilizes.
+
+```python
+from fiat_lux_agents import ChartDigitizerBot
+
+bot = ChartDigitizerBot()
+result = bot.digitize(
+    image_bytes=png_bytes,
+    chart_description="""
+        X-axis: Days post-infection (0–600)
+        Left Y-axis: Platelet count x1000/uL (linear, 0–350)
+        Platelet: continuous solid black line
+    """,
+    data_keys=["platelets", "vl"],
+    x_field="dpi",
+    max_passes=4,
+)
+# result["platelets"] = [{"dpi": 0, "value": 197, "confidence": 0.9}, ...]
+# result["_passes"]   = 3
+# result["_stop_reason"] = "stabilized"
+```
+
+Completely generic — no assumptions about chart type. The caller describes the axes, scales, and marker types in plain text. Requires `matplotlib` for comparison chart rendering.
+
+---
+
 ## Installation
 
 ```bash
@@ -251,7 +364,23 @@ HierarchicalFilterChatBot  → same model, hierarchical data
 ChatBot                    → generates pandas query + viz config
     └── QueryEngine        → validates + executes query on DataFrame
 
-SummaryBot                 → plain text answers, no code generation
+SummaryBot                 → plain text answers about a dataset, no code generation
+
+DocumentBot                → unstructured document text → HTML visualization or text answer
+    ├── process()          → full document context (initial viz, re-reads)
+    └── refine()           → HTML-only context (faster for styling changes)
+
+KnowledgeBot               → curated knowledge base → markdown Q&A answers
+    └── with_page_context() → narrowed focus per page, shared knowledge base
+
+WebSearchBot               → live internet queries → plain text answers
+    ├── search()           → web search via Anthropic's built-in tools
+    └── fetch()            → fetch + summarize a specific URL
+
+ChartDigitizerBot          → chart image → extracted data series (JSON)
+    ├── pass 1             → initial extraction from image
+    ├── pass 2..N          → comparison overlay → Claude fixes gaps and missed peaks
+    └── stop when          → point count stabilizes or max_passes reached
 ```
 
 Data stays in the app. Bots borrow it, process it, return results.
