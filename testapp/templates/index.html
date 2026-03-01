@@ -11,7 +11,7 @@
   <div style="display:flex;align-items:center;justify-content:space-between">
     <div>
       <h1>fiat-lux-agents — test app</h1>
-      <p>Sales dataset · 60 records · 15 columns · Testing FilterBot, ChatBot, FilterChatBot, QueryEngine</p>
+      <p>Employee dataset · 150 records · 20 columns · salary, churn, promotion, performance</p>
     </div>
     <a href="/about" title="About fiat-lux-agents" style="color:#aaa;line-height:0;transition:color 0.15s" onmouseover="this.style.color='#fff'" onmouseout="this.style.color='#aaa'">
       <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -41,9 +41,10 @@
   </div>
   <table id="data-table">
     <thead><tr>
-      <th>Name</th><th>Region</th><th>Category</th><th>Status</th>
-      <th>Amount</th><th>Profit</th><th>Margin%</th>
-      <th>Units</th><th>Days Close</th><th>Exp</th><th>Score</th><th>Month</th>
+      <th>Name</th><th>Department</th><th>Role</th><th>Age</th><th>Tenure</th>
+      <th>Education</th><th>Remote</th><th>Hours/Wk</th><th>Projects</th>
+      <th>Training</th><th>Absences</th><th>Perf</th><th>Satisfaction</th>
+      <th>Salary</th><th>Bonus%</th><th>Last Review</th><th>Promoted</th><th>Churned</th>
     </tr></thead>
     <tbody></tbody>
   </table>
@@ -61,9 +62,10 @@
       </div>
       <table id="filter-table">
         <thead><tr>
-          <th>Name</th><th>Region</th><th>Category</th><th>Status</th>
-          <th>Amount</th><th>Profit</th><th>Margin%</th>
-          <th>Units</th><th>Days Close</th><th>Exp</th><th>Score</th><th>Month</th>
+          <th>Name</th><th>Department</th><th>Role</th><th>Age</th><th>Tenure</th>
+          <th>Education</th><th>Remote</th><th>Hours/Wk</th><th>Projects</th>
+          <th>Training</th><th>Absences</th><th>Perf</th><th>Satisfaction</th>
+          <th>Salary</th><th>Bonus%</th><th>Last Review</th><th>Promoted</th><th>Churned</th>
         </tr></thead>
         <tbody></tbody>
       </table>
@@ -83,11 +85,11 @@
           <h3>Try these:</h3>
           <div style="display:flex;flex-direction:column;gap:4px;margin-top:6px;">
             <button class="btn-sm" onclick="setFilter('only completed sales')">only completed</button>
-            <button class="btn-sm" onclick="setFilter('amount greater than 1000')">amount > 1000</button>
-            <button class="btn-sm" onclick="setFilter('margin_pct greater than 40')">margin > 40%</button>
-            <button class="btn-sm" onclick="setFilter('rep_experience at least 8 years')">experienced reps</button>
-            <button class="btn-sm" onclick="setFilter('customer_score above 8')">high satisfaction</button>
-            <button class="btn-sm" onclick="setFilter('only Electronics category')">only Electronics</button>
+            <button class="btn-sm" onclick="setFilter('only Engineering department')">Engineering only</button>
+            <button class="btn-sm" onclick="setFilter('salary above 100000')">salary > $100k</button>
+            <button class="btn-sm" onclick="setFilter('performance_score at least 4')">high performers</button>
+            <button class="btn-sm" onclick="setFilter('churned is true')">churned</button>
+            <button class="btn-sm" onclick="setFilter('tenure_years greater than 5')">5+ yr tenure</button>
           </div>
         </div>
       </div>

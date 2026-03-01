@@ -28,7 +28,7 @@ filter_chat_history = []
 
 filter_bot = FilterBot()
 filter_chat_bot = FilterChatBot(
-    dataset_description="60 sales records with fields: name, region, category, status, month, amount, units, price_per_unit, cost, profit, margin_pct, days_to_close, rep_experience, customer_score"
+    dataset_description="150 employee records with fields: name, department, role, age, tenure_years, hire_year, education, remote, hours_per_week, projects_completed, training_hours, absences, performance_score, satisfaction_score, salary, bonus_pct, last_review, promoted, churned"
 )
 
 

@@ -44,11 +44,13 @@ function renderTable(id, rows) {
 
   tbody.innerHTML = toRender.map(r => `
     <tr class="${r._visible ? '' : 'filtered-out'}">
-      <td>${r.name}</td><td>${r.region}</td><td>${r.category}</td>
-      <td>${r.status}</td><td>$${r.amount.toLocaleString()}</td>
-      <td>$${r.profit.toLocaleString()}</td><td>${r.margin_pct}%</td>
-      <td>${r.units}</td><td>${r.days_to_close}d</td>
-      <td>${r.rep_experience}yr</td><td>${r.customer_score}</td><td>${r.month}</td>
+      <td>${r.name}</td><td>${r.department}</td><td>${r.role}</td>
+      <td>${r.age}</td><td>${r.tenure_years}yr</td><td>${r.education}</td>
+      <td>${r.remote}</td><td>${r.hours_per_week}</td><td>${r.projects_completed}</td>
+      <td>${r.training_hours}</td><td>${r.absences}</td><td>${r.performance_score}</td>
+      <td>${r.satisfaction_score}</td><td>$${r.salary.toLocaleString()}</td>
+      <td>${r.bonus_pct}%</td><td>${r.last_review}</td>
+      <td>${r.promoted ? '✓' : ''}</td><td>${r.churned ? '✓' : ''}</td>
     </tr>`).join('');
 }
 
