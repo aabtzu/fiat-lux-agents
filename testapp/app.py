@@ -16,6 +16,7 @@ load_dotenv()
 
 from fiat_lux_agents import (
     FilterBot, FilterEngine, FilterChatBot,
+    MLBot,
     make_explorer_blueprint,
 )
 from data import SAMPLE_DATA, SCHEMA, SUMMARY
@@ -27,6 +28,8 @@ filter_engine = FilterEngine()
 filter_chat_history = []
 
 filter_bot = FilterBot()
+ml_bot = MLBot(schema=SCHEMA)
+ml_history = []
 filter_chat_bot = FilterChatBot(
     dataset_description="150 employee records with fields: name, department, role, age, tenure_years, hire_year, education, remote, hours_per_week, projects_completed, training_hours, absences, performance_score, satisfaction_score, salary, bonus_pct, last_review, promoted, churned"
 )
@@ -176,6 +179,30 @@ def filter_chat():
 @app.route('/api/filterchat/clear', methods=['POST'])
 def clear_filter_chat():
     filter_chat_history.clear()
+    return jsonify({'ok': True})
+
+
+@app.route('/api/ml', methods=['POST'])
+def ml_query():
+    data = request.get_json()
+    task = data.get('message', '').strip()
+    if not task:
+        return jsonify({'error': 'No message provided'}), 400
+
+    df = pd.DataFrame(SAMPLE_DATA)
+    result = ml_bot.run(df, task, history=ml_history)
+
+    ml_history.append({'role': 'user', 'content': task})
+    ml_history.append({'role': 'assistant', 'content': result.get('answer', '')})
+    if len(ml_history) > 12:
+        ml_history[:] = ml_history[-12:]
+
+    return jsonify(result)
+
+
+@app.route('/api/ml/clear', methods=['POST'])
+def ml_clear():
+    ml_history.clear()
     return jsonify({'ok': True})
 
 

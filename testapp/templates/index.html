@@ -27,6 +27,7 @@
   <div class="tab" data-tab="filter">Filter</div>
   <div class="tab" data-tab="explorer">Explorer</div>
   <div class="tab" data-tab="filterchat">Filter Chat</div>
+  <div class="tab" data-tab="ml">ML</div>
 </nav>
 
 <!-- DATA TAB -->
@@ -39,6 +40,7 @@
     </div>
     <button id="btn-show-filtered" class="btn-toggle-visibility" onclick="toggleShowFiltered()">Show filtered out</button>
   </div>
+  <div class="table-scroll">
   <table id="data-table">
     <thead><tr>
       <th>Name</th><th>Department</th><th>Role</th><th>Age</th><th>Tenure</th>
@@ -48,6 +50,7 @@
     </tr></thead>
     <tbody></tbody>
   </table>
+  </div>
 </div>
 
 <!-- FILTER TAB -->
@@ -60,6 +63,7 @@
         </div>
         <button id="btn-show-filtered-filter" class="btn-toggle-visibility" onclick="toggleShowFiltered()">Show filtered out</button>
       </div>
+      <div class="table-scroll">
       <table id="filter-table">
         <thead><tr>
           <th>Name</th><th>Department</th><th>Role</th><th>Age</th><th>Tenure</th>
@@ -69,6 +73,7 @@
         </tr></thead>
         <tbody></tbody>
       </table>
+      </div>
     </div>
     <div>
       <div class="sidebar-card">
@@ -129,6 +134,43 @@
       </div>
     </div>
   </div>
+</div>
+
+<!-- ML TAB -->
+<div class="panel" id="tab-ml">
+  <div class="chat-layout">
+    <div>
+      <div class="messages" id="ml-messages">
+        <div class="msg assistant">Describe a modeling task — I'll train the model, compute metrics, show feature importance, and return predictions.</div>
+      </div>
+      <div class="input-row" style="margin-top:10px">
+        <input type="text" id="ml-input" placeholder='e.g. "predict churn with random forest"'>
+        <button onclick="runML()">Run</button>
+      </div>
+      <div id="ml-status" style="margin-top:8px;font-size:12px;color:#666;"></div>
+    </div>
+    <div>
+      <div class="sidebar-card">
+        <h3>Try these</h3>
+        <div style="display:flex;flex-direction:column;gap:4px;margin-top:6px;">
+          <button class="btn-sm" onclick="setMLTask('predict churn with a random forest. show feature importance')">churn — random forest</button>
+          <button class="btn-sm" onclick="setMLTask('predict salary using gradient boosting. show feature importance and actual vs predicted')">salary — gradient boosting</button>
+          <button class="btn-sm" onclick="setMLTask('predict whether an employee was promoted using logistic regression')">promotion — logistic reg</button>
+          <button class="btn-sm" onclick="setMLTask('cluster employees into 4 segments using KMeans. show a scatter plot colored by cluster')">cluster — KMeans</button>
+          <button class="btn-sm" onclick="setMLTask('build a small neural net to predict salary')">salary — neural net</button>
+        </div>
+        <div style="margin-top:16px">
+          <button class="btn-sm" onclick="clearML()" style="width:100%;color:#c00">Clear history</button>
+        </div>
+      </div>
+      <div class="sidebar-card" id="ml-metrics-card" style="display:none">
+        <h3>Metrics</h3>
+        <div id="ml-metrics"></div>
+      </div>
+    </div>
+  </div>
+  <div id="ml-chart" style="margin-top:16px"></div>
+  <div id="ml-tables" style="margin-top:16px;display:flex;gap:16px;flex-wrap:wrap"></div>
 </div>
 
 <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>

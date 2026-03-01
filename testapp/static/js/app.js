@@ -206,9 +206,98 @@ function setMessageText(el, text, role) {
   }
 }
 
+// ── ML Tab ────────────────────────────────────────────────────────────────────
+
+function setMLTask(text) {
+  document.getElementById('ml-input').value = text;
+  runML();
+}
+
+async function runML() {
+  const input = document.getElementById('ml-input');
+  const msg   = input.value.trim();
+  if (!msg) return;
+
+  appendMsg('ml-messages', msg, 'user');
+  input.value = '';
+  setStatus('ml-status', 'Running model…');
+
+  const res = await fetch('/api/ml', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message: msg }),
+  }).then(r => r.json());
+
+  setStatus('ml-status', '');
+
+  // Answer
+  const answer = res.answer || (res.error ? `Error: ${res.error}` : 'No response');
+  appendMsg('ml-messages', answer, 'assistant');
+
+  // Metrics card
+  if (res.metrics && Object.keys(res.metrics).length) {
+    const card = document.getElementById('ml-metrics-card');
+    const div  = document.getElementById('ml-metrics');
+    div.innerHTML = Object.entries(res.metrics)
+      .map(([k, v]) => `<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #f0f0f0;font-size:13px">
+        <span style="color:#555">${k}</span>
+        <span style="font-weight:600">${typeof v === 'number' ? v.toLocaleString(undefined, {maximumFractionDigits: 4}) : v}</span>
+      </div>`).join('');
+    card.style.display = '';
+  }
+
+  // Chart
+  if (res.fig_json) {
+    const chartDiv = document.getElementById('ml-chart');
+    chartDiv.innerHTML = '<div id="ml-plotly" style="background:#fff;border-radius:6px;padding:8px"></div>';
+    Plotly.newPlot('ml-plotly', JSON.parse(res.fig_json));
+  }
+
+  // Feature importance + predictions tables
+  const tablesDiv = document.getElementById('ml-tables');
+  tablesDiv.innerHTML = '';
+  if (res.feature_importance?.length) {
+    tablesDiv.appendChild(buildMLTable('Feature Importance', res.feature_importance, ['Feature', 'Importance'], v =>
+      typeof v === 'number' ? v.toFixed(4) : v
+    ));
+  }
+  if (res.predictions?.length) {
+    const cols = Object.keys(res.predictions[0]);
+    tablesDiv.appendChild(buildMLTable(`Predictions (${res.predictions.length} rows)`, res.predictions, cols));
+  }
+}
+
+function buildMLTable(title, rows, cols, fmt) {
+  const wrap = document.createElement('div');
+  wrap.style.cssText = 'flex:1;min-width:280px;max-width:540px';
+  wrap.innerHTML = `<h4 style="font-size:13px;font-weight:600;margin-bottom:8px">${title}</h4>`;
+  const scroll = document.createElement('div');
+  scroll.style.cssText = 'overflow-x:auto;max-height:320px;overflow-y:auto';
+  const table = document.createElement('table');
+  table.style.cssText = 'font-size:12px;white-space:nowrap';
+  table.innerHTML = `<thead><tr>${cols.map(c => `<th>${c}</th>`).join('')}</tr></thead>
+    <tbody>${rows.map(r => `<tr>${cols.map(c => {
+      const v = r[c] ?? '';
+      return `<td>${fmt ? fmt(v, c) : v}</td>`;
+    }).join('')}</tr>`).join('')}</tbody>`;
+  scroll.appendChild(table);
+  wrap.appendChild(scroll);
+  return wrap;
+}
+
+async function clearML() {
+  await fetch('/api/ml/clear', { method: 'POST' });
+  document.getElementById('ml-messages').innerHTML =
+    '<div class="msg assistant">History cleared. Describe a modeling task to begin.</div>';
+  document.getElementById('ml-metrics-card').style.display = 'none';
+  document.getElementById('ml-chart').innerHTML = '';
+  document.getElementById('ml-tables').innerHTML = '';
+}
+
 // Enter key support
 document.getElementById('filter-input').addEventListener('keydown',     e => { if (e.key === 'Enter') addFilter(); });
 document.getElementById('filterchat-input').addEventListener('keydown', e => { if (e.key === 'Enter') sendFilterChat(); });
+document.getElementById('ml-input').addEventListener('keydown',         e => { if (e.key === 'Enter') runML(); });
 
 // Initial load
 loadData();
