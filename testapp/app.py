@@ -8,7 +8,7 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 import markdown
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, request, jsonify, render_template, send_from_directory
 from dotenv import load_dotenv
 import pandas as pd
 
@@ -185,7 +185,15 @@ def about():
     with open(readme_path, 'r') as f:
         content = f.read()
     html = markdown.markdown(content, extensions=['tables', 'fenced_code'])
+    # Rewrite relative image paths so Flask can serve them
+    html = html.replace('src="docs/', 'src="/docs/')
     return render_template('about.html', content=html)
+
+
+@app.route('/docs/<path:filename>')
+def docs_static(filename):
+    docs_dir = os.path.join(os.path.dirname(__file__), '..', 'docs')
+    return send_from_directory(docs_dir, filename)
 
 
 if __name__ == '__main__':
