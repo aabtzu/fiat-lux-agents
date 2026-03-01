@@ -59,9 +59,20 @@ Answer guidelines:
 
 Query guidelines:
 - NO import statements — pre-imported: pd, np, scipy_stats (scipy.stats), df already loaded
+  Also pre-imported for ML: LinearRegression, LogisticRegression, Ridge, Lasso,
+  StandardScaler, LabelEncoder, OneHotEncoder, train_test_split, cross_val_score,
+  r2_score, mean_squared_error, accuracy_score, classification_report,
+  RandomForestClassifier, RandomForestRegressor, KMeans
 - DataFrame is named 'df'
 - MUST assign result to variable named 'result'
-- Use scipy_stats for regression: slope, intercept, r, p, se = scipy_stats.linregress(x, y)
+- DTYPE RULE: pd.get_dummies() returns bool columns in pandas 2+. ALWAYS cast to float:
+  edu_dummies = pd.get_dummies(df['col'], drop_first=True).astype(float)
+  Or use dtype=int: pd.get_dummies(df['col'], dtype=int)
+- Use scipy_stats for simple regression: slope, intercept, r, p, se = scipy_stats.linregress(x, y)
+- Use LinearRegression for multiple regression (handles dtypes automatically):
+  X = pd.get_dummies(df[features], drop_first=True).astype(float)
+  model = LinearRegression().fit(X, df['target'])
+  result = pd.DataFrame({{'Feature': X.columns, 'Coefficient': model.coef_}})
 - For top N: result = df.groupby('name')['value'].max().nlargest(10).reset_index()
 - For comparisons: groupby + agg
 - If query is not null, it MUST contain the pattern: result = ...
@@ -80,6 +91,9 @@ Fig_code guidelines:
   BAD (causes error): import plotly.express as px  /  import numpy as np  /  from scipy import stats
   GOOD: px.histogram(...)  /  np.mean(...)  /  scipy_stats.mannwhitneyu(...)
 - Pre-imported names: px, go, pd, np, scipy_stats (this IS scipy.stats — use scipy_stats.linregress etc.)
+  Also available: LinearRegression, LogisticRegression, Ridge, Lasso, StandardScaler,
+  RandomForestClassifier, RandomForestRegressor, KMeans, r2_score, train_test_split
+- DTYPE RULE: always cast get_dummies to float: pd.get_dummies(...).astype(float)
 - Set "fig_code" to null for plain table results with no visualization
 - Available variables: df (full DataFrame), result (from query above, may be None if query is null)
 - MUST assign a Plotly figure to a variable named 'fig'

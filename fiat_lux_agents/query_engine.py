@@ -12,6 +12,18 @@ try:
 except ImportError:
     _scipy_stats = None
 
+try:
+    import sklearn.linear_model as _skl_linear
+    import sklearn.preprocessing as _skl_pre
+    import sklearn.metrics as _skl_metrics
+    import sklearn.model_selection as _skl_ms
+    import sklearn.ensemble as _skl_ensemble
+    import sklearn.cluster as _skl_cluster
+    import sklearn as _sklearn
+    _sklearn_available = True
+except ImportError:
+    _sklearn_available = False
+
 # Long, unambiguous strings safe to check as substrings in code text
 BLOCKED_SUBSTRINGS = {
     '__import__', '__builtins__', '__class__', '__dict__', '__code__',
@@ -37,7 +49,15 @@ class QueryValidationError(Exception):
 
 
 def _df_to_records(df: pd.DataFrame) -> list:
-    """Convert DataFrame to JSON-safe records (NaN → None)."""
+    """Convert DataFrame to JSON-safe records (NaN → None, mixed dtypes handled)."""
+    # Coerce object columns that contain mixed numeric/None — avoids pandas 2+ dtype errors
+    df = df.copy()
+    for col in df.columns:
+        if df[col].dtype == object:
+            try:
+                df[col] = pd.to_numeric(df[col], errors='ignore')
+            except Exception:
+                pass
     return json.loads(df.to_json(orient='records'))
 
 
@@ -114,6 +134,25 @@ def execute_query(query_code: str, df: pd.DataFrame, max_rows: int = 1000) -> di
         'np': np,
         'scipy_stats': _scipy_stats,
         'df': df.copy(),
+        # sklearn submodules — pre-imported so LLM code can use them without import statements
+        **({'sklearn': _sklearn,
+            'LinearRegression':      _skl_linear.LinearRegression,
+            'LogisticRegression':    _skl_linear.LogisticRegression,
+            'Ridge':                 _skl_linear.Ridge,
+            'Lasso':                 _skl_linear.Lasso,
+            'StandardScaler':        _skl_pre.StandardScaler,
+            'LabelEncoder':          _skl_pre.LabelEncoder,
+            'OneHotEncoder':         _skl_pre.OneHotEncoder,
+            'train_test_split':      _skl_ms.train_test_split,
+            'cross_val_score':       _skl_ms.cross_val_score,
+            'r2_score':              _skl_metrics.r2_score,
+            'mean_squared_error':    _skl_metrics.mean_squared_error,
+            'accuracy_score':        _skl_metrics.accuracy_score,
+            'classification_report': _skl_metrics.classification_report,
+            'RandomForestClassifier':_skl_ensemble.RandomForestClassifier,
+            'RandomForestRegressor': _skl_ensemble.RandomForestRegressor,
+            'KMeans':                _skl_cluster.KMeans,
+           } if _sklearn_available else {}),
         '__builtins__': {
             'len': len, 'max': max, 'min': min, 'sum': sum,
             'abs': abs, 'round': round, 'sorted': sorted,
@@ -122,6 +161,7 @@ def execute_query(query_code: str, df: pd.DataFrame, max_rows: int = 1000) -> di
             'True': True, 'False': False, 'None': None,
             'range': range, 'enumerate': enumerate, 'zip': zip,
             'print': print,
+            '__import__': __import__,  # numpy needs this for internal lazy imports
         }
     }
 
@@ -203,6 +243,24 @@ def execute_fig_code(fig_code: str, df: pd.DataFrame, result: pd.DataFrame = Non
         'pd': pd,
         'np': np,
         'scipy_stats': _scipy_stats,
+        **({'sklearn': _sklearn,
+            'LinearRegression':      _skl_linear.LinearRegression,
+            'LogisticRegression':    _skl_linear.LogisticRegression,
+            'Ridge':                 _skl_linear.Ridge,
+            'Lasso':                 _skl_linear.Lasso,
+            'StandardScaler':        _skl_pre.StandardScaler,
+            'LabelEncoder':          _skl_pre.LabelEncoder,
+            'OneHotEncoder':         _skl_pre.OneHotEncoder,
+            'train_test_split':      _skl_ms.train_test_split,
+            'cross_val_score':       _skl_ms.cross_val_score,
+            'r2_score':              _skl_metrics.r2_score,
+            'mean_squared_error':    _skl_metrics.mean_squared_error,
+            'accuracy_score':        _skl_metrics.accuracy_score,
+            'classification_report': _skl_metrics.classification_report,
+            'RandomForestClassifier':_skl_ensemble.RandomForestClassifier,
+            'RandomForestRegressor': _skl_ensemble.RandomForestRegressor,
+            'KMeans':                _skl_cluster.KMeans,
+           } if _sklearn_available else {}),
         '__builtins__': {
             'len': len, 'max': max, 'min': min, 'sum': sum,
             'abs': abs, 'round': round, 'sorted': sorted,
@@ -211,6 +269,7 @@ def execute_fig_code(fig_code: str, df: pd.DataFrame, result: pd.DataFrame = Non
             'True': True, 'False': False, 'None': None,
             'range': range, 'enumerate': enumerate, 'zip': zip,
             'print': print,
+            '__import__': __import__,
         }
     }
 
