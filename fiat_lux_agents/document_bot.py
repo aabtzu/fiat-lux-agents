@@ -357,12 +357,10 @@ Added a bar chart grouping session amounts by month.
             html = html.rsplit("```", 1)[0]
         return {"message": message, "html": html.strip()}
 
-    _WEB_TOOLS = [{"type": "web_search_20260209", "name": "web_search"}]
-
     def _call_and_parse(self, system_prompt: str, messages: list) -> Dict:
         """Call the API and parse the ---HTML--- delimited response."""
         try:
-            response_text = self.call_api(system_prompt, messages, tools=self._WEB_TOOLS)
+            response_text = self.call_api(system_prompt, messages)
         except Exception as e:
             return {"message": f"I couldn't process that: {str(e)}", "html": None}
 
