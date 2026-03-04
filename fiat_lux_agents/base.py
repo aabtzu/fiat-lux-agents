@@ -38,28 +38,36 @@ class LLMBase:
         self.model = model
         self.max_tokens = max_tokens
 
-    def call_api(self, system_prompt, messages, return_full_response=False):
+    def call_api(self, system_prompt, messages, return_full_response=False, tools=None):
         """
         Call Claude API.
 
         Args:
-            system_prompt: System prompt string
-            messages: List of {"role": "user"|"assistant", "content": "..."} dicts
+            system_prompt:        System prompt string
+            messages:             List of {"role": "user"|"assistant", "content": "..."} dicts
             return_full_response: If True, return full response object; otherwise return text
+            tools:                Optional list of tool dicts (e.g. web_search, web_fetch)
 
         Returns:
             Response text string, or full response object if return_full_response=True
         """
         try:
-            response = self.client.messages.create(
+            kwargs = dict(
                 model=self.model,
                 max_tokens=self.max_tokens,
                 system=system_prompt,
-                messages=messages
+                messages=messages,
             )
+            if tools:
+                kwargs["tools"] = tools
+            response = self.client.messages.create(**kwargs)
             if return_full_response:
                 return response
-            return response.content[0].text
+            # Extract text — works for both plain responses and server-side tool use
+            for block in reversed(response.content):
+                if hasattr(block, "text") and block.text:
+                    return block.text
+            return ""
         except Exception as e:
             raise RuntimeError(f"Claude API error: {str(e)}")
 

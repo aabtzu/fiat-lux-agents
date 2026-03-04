@@ -37,10 +37,32 @@ Usage:
     result = bot.process(["Invoice 1...", "Invoice 2..."], request="Combine into one view")
 """
 
+import base64
 from typing import Dict, List, Optional, Union
 from .base import LLMBase, DEFAULT_MODEL
 
 HTML_MARKER = "---HTML---"
+PYTHON_MARKER = "---PYTHON---"
+
+
+def _build_content(text: str, style_refs=None):
+    """
+    Build message content. Returns a plain string when no style refs are present,
+    or a list of content blocks (image/document + text) when style refs are provided.
+    """
+    if not style_refs:
+        return text
+
+    blocks = [{"type": "text", "text": "Style reference files — match this visual layout, chart types, colors, and structure:"}]
+    for ref in style_refs:
+        mime = ref.get('mime_type', '')
+        b64 = base64.standard_b64encode(ref['bytes']).decode()
+        if mime == 'application/pdf':
+            blocks.append({"type": "document", "source": {"type": "base64", "media_type": "application/pdf", "data": b64}})
+        elif mime.startswith('image/'):
+            blocks.append({"type": "image", "source": {"type": "base64", "media_type": mime, "data": b64}})
+    blocks.append({"type": "text", "text": text})
+    return blocks
 
 
 class DocumentBot(LLMBase):
@@ -169,6 +191,7 @@ ANSWER STYLE:
         current_html: Optional[str] = None,
         template_html: Optional[str] = None,
         template_name: Optional[str] = None,
+        style_refs: Optional[List[Dict]] = None,
     ) -> Dict:
         """
         Process a user request against document content.
@@ -210,14 +233,16 @@ ANSWER STYLE:
             parts.append(f"Current visualization HTML:\n{current_html}\n---")
 
         parts.append(f"User request: {request}")
+        text_content = "\n\n".join(parts)
 
-        messages = [{"role": "user", "content": "\n\n".join(parts)}]
+        messages = [{"role": "user", "content": _build_content(text_content, style_refs)}]
         return self._call_and_parse(self._SYSTEM_PROMPT, messages)
 
     def refine(
         self,
         current_html: str,
         request: str,
+        style_refs: Optional[List[Dict]] = None,
     ) -> Dict:
         """
         Refine an existing visualization without re-sending document context.
@@ -233,15 +258,11 @@ ANSWER STYLE:
         Returns:
             {"message": str, "html": str | None}
         """
-        messages = [
-            {
-                "role": "user",
-                "content": (
-                    f"Current visualization HTML:\n\n{current_html}\n\n---\n\n"
-                    f"Please make this change: {request}"
-                ),
-            }
-        ]
+        text_content = (
+            f"Current visualization HTML:\n\n{current_html}\n\n---\n\n"
+            f"Please make this change: {request}"
+        )
+        messages = [{"role": "user", "content": _build_content(text_content, style_refs)}]
         return self._call_and_parse(self._REFINE_SYSTEM_PROMPT, messages)
 
     _CHART_ONLY_PROMPT = f"""You are a data visualization expert. Generate ONLY a self-contained chart component to be appended to an existing page.
@@ -336,10 +357,12 @@ Added a bar chart grouping session amounts by month.
             html = html.rsplit("```", 1)[0]
         return {"message": message, "html": html.strip()}
 
+    _WEB_TOOLS = [{"type": "web_search_20260209", "name": "web_search"}]
+
     def _call_and_parse(self, system_prompt: str, messages: list) -> Dict:
         """Call the API and parse the ---HTML--- delimited response."""
         try:
-            response_text = self.call_api(system_prompt, messages)
+            response_text = self.call_api(system_prompt, messages, tools=self._WEB_TOOLS)
         except Exception as e:
             return {"message": f"I couldn't process that: {str(e)}", "html": None}
 
@@ -360,3 +383,67 @@ Added a bar chart grouping session amounts by month.
         html = html.strip()
 
         return {"message": message, "html": html}
+
+    _TO_PYTHON_SYSTEM_PROMPT = f"""You are a Python data visualization expert.
+
+You will receive the HTML source of a data visualization. Your job is to write
+self-contained Python code that recreates the same visualization using
+matplotlib, plotly, or pandas — choosing whichever fits best.
+
+RESPONSE FORMAT:
+Write one sentence describing what the code does, then output the Python code
+after "{PYTHON_MARKER}"
+
+RULES:
+- Extract all data from the HTML (window.DOCUMENT_DATA JSON, <table> elements,
+  or any inline JS arrays) and embed it as Python lists/dicts inline in the code.
+- Include every import at the top.
+- The script should run with `python script.py` — no external data files.
+- Reproduce the same charts, tables, or summary cards as faithfully as possible.
+- Use plotly if the original has interactive charts; matplotlib otherwise.
+- Add `plt.show()` / `fig.show()` at the end so the output is visible.
+- Do NOT include the HTML itself in the output.
+
+Example response:
+Recreates the monthly expense bar chart and summary table from the visualization.
+{PYTHON_MARKER}
+import matplotlib.pyplot as plt
+import pandas as pd
+
+data = [
+    {{"date": "2024-01", "amount": 120.0, "category": "Therapy"}},
+    ...
+]
+df = pd.DataFrame(data)
+...
+plt.show()"""
+
+    def to_python(self, html: str) -> Dict:
+        """
+        Convert an HTML visualization to equivalent self-contained Python code.
+
+        Returns:
+            {"message": str, "code": str | None}
+        """
+        messages = [
+            {
+                "role": "user",
+                "content": f"Visualization HTML:\n\n{html}",
+            }
+        ]
+        try:
+            response_text = self.call_api(self._TO_PYTHON_SYSTEM_PROMPT, messages)
+        except Exception as e:
+            return {"message": f"Could not generate Python code: {str(e)}", "code": None}
+
+        marker_index = response_text.find(PYTHON_MARKER)
+        if marker_index == -1:
+            return {"message": response_text.strip(), "code": None}
+
+        message = response_text[:marker_index].strip()
+        code = response_text[marker_index + len(PYTHON_MARKER):].strip()
+        if code.startswith("```"):
+            code = code.split("\n", 1)[-1]
+        if code.endswith("```"):
+            code = code.rsplit("```", 1)[0]
+        return {"message": message, "code": code.strip()}
