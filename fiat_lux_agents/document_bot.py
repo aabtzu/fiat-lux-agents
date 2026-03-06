@@ -151,6 +151,28 @@ JAVASCRIPT RULES:
 - When using JS: ALL functions must be defined inline in a <script> tag
 - Define data arrays at the top of the script
 - If your HTML were inserted into an empty div, would all functions exist? Test mentally.
+- CHECKBOX PERSISTENCE: if the viz has checkboxes, save/restore their state using localStorage.
+  Key pattern: `fl-cb-<unique-id>` where unique-id is derived from a stable property (e.g. row index or data field).
+  On load: restore from localStorage. On change: save to localStorage immediately.
+  Example:
+  <script>
+    function saveCbState() {{
+      const state = {{}};
+      document.querySelectorAll('input[type=checkbox][data-key]').forEach(cb => {{
+        state[cb.dataset.key] = cb.checked;
+      }});
+      localStorage.setItem('fl-cb-{{STABLE_ID}}', JSON.stringify(state));
+    }}
+    function restoreCbState() {{
+      const state = JSON.parse(localStorage.getItem('fl-cb-{{STABLE_ID}}') || '{{}}');
+      document.querySelectorAll('input[type=checkbox][data-key]').forEach(cb => {{
+        if (cb.dataset.key in state) cb.checked = state[cb.dataset.key];
+      }});
+    }}
+    document.addEventListener('change', e => {{ if (e.target.type === 'checkbox') saveCbState(); }});
+    document.addEventListener('DOMContentLoaded', restoreCbState);
+  </script>
+  Replace {{STABLE_ID}} with a short hash or slug of the document title so keys don't collide across docs.
 
 TEMPLATES:
 - If a TEMPLATE is provided, match its exact layout, styling, colors, and structure
@@ -169,7 +191,7 @@ RULES FOR VISUALIZATION CHANGES:
 2. Output the complete updated HTML after "{HTML_MARKER}"
 3. Preserve all existing data and structure unless asked to change it
 4. Apply requested changes while keeping everything else intact
-5. Maintain any existing JavaScript functionality
+5. Maintain any existing JavaScript functionality, including localStorage checkbox persistence
 
 ANSWER STYLE:
 - Be concise by default. Key answer first, then essential details only.
