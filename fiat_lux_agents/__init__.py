@@ -15,6 +15,7 @@ from .knowledge_bot import KnowledgeBot
 from .document_bot import DocumentBot
 from .web_search_bot import WebSearchBot
 from .ml_bot import MLBot
+from .document_extractor import DocumentExtractor
 
 __all__ = [
     "LLMBase",
@@ -35,6 +36,7 @@ __all__ = [
     "DocumentBot",
     "WebSearchBot",
     "MLBot",
+    "DocumentExtractor",
     "diversify_sample",
     "make_explorer_blueprint",
 ]
