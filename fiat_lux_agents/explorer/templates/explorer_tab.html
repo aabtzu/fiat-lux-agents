@@ -17,7 +17,7 @@
             <div class="fla-examples">
                 <p class="fla-hint">Suggestions:</p>
                 {% for q in _cfg.example_questions %}
-                <button class="fla-example-btn" onclick="Explorer.suggest({{ q.question | tojson }})">
+                <button class="fla-example-btn" onclick="Explorer.ask({{ q.question | tojson }})">
                     {{ q.label }}
                 </button>
                 {% endfor %}
