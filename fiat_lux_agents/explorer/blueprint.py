@@ -130,7 +130,10 @@ def make_explorer_blueprint(
         conversation_history = _sessions[session_id]
 
         # Get data — caller decides what to return based on scope/filters
-        df = get_dataframe(scope=scope, active_filters=active_filters)
+        try:
+            df = get_dataframe(scope=scope, active_filters=active_filters)
+        except Exception as e:
+            return jsonify({'success': False, 'error': f'Data load error: {str(e)}'}), 500
 
         summary = (
             get_summary(scope=scope, active_filters=active_filters)
