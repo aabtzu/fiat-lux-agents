@@ -22,6 +22,34 @@
     let historyDraft    = '';   // saves current draft when user starts browsing
     let activeFeature   = null; // optional feature column to focus queries on
 
+    // ── localStorage persistence ─────────────────────────────────────────────
+    // Keyed by query_url so each explorer blueprint has its own slot.
+
+    const STORE_KEY = 'fla_state_' + QUERY_URL;
+
+    function _saveState(lastResult) {
+        try {
+            const msgs = $('fla-messages');
+            localStorage.setItem(STORE_KEY, JSON.stringify({
+                sessionId,
+                inputHistory,
+                messagesHtml: msgs ? msgs.innerHTML : '',
+                lastResult: lastResult || null,
+            }));
+        } catch (_) {}
+    }
+
+    function _loadState() {
+        try {
+            const raw = localStorage.getItem(STORE_KEY);
+            return raw ? JSON.parse(raw) : null;
+        } catch (_) { return null; }
+    }
+
+    function _clearState() {
+        try { localStorage.removeItem(STORE_KEY); } catch (_) {}
+    }
+
     // ── DOM helpers ──────────────────────────────────────────────────────────
 
     function $(id) { return document.getElementById(id); }
@@ -141,6 +169,7 @@
                 sessionId = data.session_id;
                 _renderResult(data);
                 _appendMsg('assistant', data.answer);
+                _saveState(data);
             }
         } catch (err) {
             _removeLoading(loadId);
@@ -165,8 +194,10 @@
             } catch (_) {}
             sessionId = null;
         }
+        inputHistory = [];
         const msgs = $('fla-messages');
         if (msgs) msgs.innerHTML = '';
+        _clearState();
         _showWelcome();
     }
 
@@ -386,6 +417,20 @@
     // ── Init ──────────────────────────────────────────────────────────────────
 
     document.addEventListener('DOMContentLoaded', function () {
+        // Restore persisted state from previous visit
+        const saved = _loadState();
+        if (saved && saved.sessionId) {
+            sessionId    = saved.sessionId;
+            inputHistory = saved.inputHistory || [];
+
+            const msgs = $('fla-messages');
+            if (msgs && saved.messagesHtml) msgs.innerHTML = saved.messagesHtml;
+
+            if (saved.lastResult) {
+                _renderResult(saved.lastResult);
+            }
+        }
+
         const input = $('fla-input');
         if (input) {
             input.addEventListener('keydown', e => {
