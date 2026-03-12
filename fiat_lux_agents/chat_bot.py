@@ -110,6 +110,7 @@ Fig_code guidelines:
 - Example bar:     fig = px.bar(result, x='category', y='value', title='Top values')
 - Example line:    fig = px.line(result, x='DPI', y='VL_log10', color='Horse_Name')
 - Example scatter: fig = px.scatter(data, x='VL_log10', y='Platelets', trendline='ols', color='SCID_Status')
+- Scatter marker size: always set marker_size=5 (default is too large): fig.update_traces(marker=dict(size=5))
 - Example box:     fig = px.box(df, x='group', y='value')
 
 Code formatting — ALWAYS write multi-line Python, never single-line:
@@ -157,7 +158,18 @@ CRITICAL: Return ONLY valid JSON with exactly 3 fields. NO import statements any
                 cleaned = clean_json_string(response_text)
                 parsed = json.loads(cleaned)
             except json.JSONDecodeError:
-                parsed = self.parse_json_response(response_text)
+                # Retry: ask the LLM to fix its malformed JSON
+                fix_messages = messages + [
+                    {'role': 'assistant', 'content': response_text},
+                    {'role': 'user', 'content':
+                        'Your response was not valid JSON. Return ONLY the corrected JSON object '
+                        'with exactly 3 fields: answer, query, fig_code. '
+                        'Ensure all strings are properly escaped (newlines as \\n, quotes as \\").'},
+                ]
+                retry_response = self.call_api(self.system_prompt, fix_messages, return_full_response=True)
+                retry_text = retry_response.content[0].text
+                cleaned = clean_json_string(retry_text)
+                parsed = json.loads(cleaned)
 
             if not isinstance(parsed, dict) or 'answer' not in parsed:
                 raise ValueError("Response missing 'answer' field")
