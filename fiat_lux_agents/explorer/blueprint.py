@@ -69,6 +69,7 @@ def make_explorer_blueprint(
     results_mode: str = "single",
     show_code: bool = True,
     code_preamble: Optional[str] = None,
+    show_table: bool = True,
 ) -> ExplorerBlueprint:
     """
     Create a self-contained Flask Blueprint for the data explorer.
@@ -96,6 +97,7 @@ def make_explorer_blueprint(
         'show_scope_toggle':  show_scope_toggle,
         'defaultScope':       default_scope,
         'results_mode':       results_mode,   # 'single' | 'scroll'
+        'show_table':         show_table,
     }
 
     bp = ExplorerBlueprint(

@@ -15,7 +15,10 @@ from .knowledge_bot import KnowledgeBot
 from .document_bot import DocumentBot
 from .web_search_bot import WebSearchBot
 from .ml_bot import MLBot
-from .data_lake_bot import DataLakeBot
+try:
+    from .data_lake_bot import DataLakeBot
+except ImportError:
+    DataLakeBot = None
 
 __all__ = [
     "LLMBase",

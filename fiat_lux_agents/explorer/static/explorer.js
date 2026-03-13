@@ -217,9 +217,9 @@
 
         const qr = data.query_result;
         if (qr?.success && Array.isArray(qr.data) && qr.data.length) {
-            // Suppress raw data tables when a chart is present — they are just noise
-            // and in scroll mode they bury previous results. Show a note instead.
-            if (chartId && qr.data.length > 20) {
+            // Suppress raw data tables when a chart is present and show_table is false.
+            // In scroll mode large tables bury previous results; suppress by default when charting.
+            if (chartId && qr.data.length > 20 && cfg.show_table === false) {
                 html += `<p class="fla-trunc">Table suppressed (${qr.data.length} rows) — see chart above.</p>`;
             } else {
                 const cols = qr.columns || Object.keys(qr.data[0]);
