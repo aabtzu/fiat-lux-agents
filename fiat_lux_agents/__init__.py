@@ -1,5 +1,5 @@
 from .base import LLMBase, clean_json_string
-from .explorer import make_explorer_blueprint
+from .explorer import make_explorer_blueprint, make_data_lake_explorer_blueprint
 from .utils import diversify_sample
 from .filter_bot import FilterBot
 from .filter_engine import FilterEngine
@@ -16,9 +16,10 @@ from .document_bot import DocumentBot
 from .web_search_bot import WebSearchBot
 from .ml_bot import MLBot
 try:
-    from .data_lake_bot import DataLakeBot
+    from .data_lake_bot import DataLakeBot, DataLakeChatBot
 except ImportError:
     DataLakeBot = None
+    DataLakeChatBot = None
 
 __all__ = [
     "LLMBase",
@@ -40,6 +41,8 @@ __all__ = [
     "WebSearchBot",
     "MLBot",
     "DataLakeBot",
+    "DataLakeChatBot",
     "diversify_sample",
     "make_explorer_blueprint",
+    "make_data_lake_explorer_blueprint",
 ]

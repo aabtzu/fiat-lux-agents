@@ -20,8 +20,9 @@ Usage:
 
 import json
 import os
+import re
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 import duckdb
 import pandas as pd
@@ -181,7 +182,26 @@ No import statements. No markdown. Return ONLY the JSON object."""
         try:
             df = duckdb.sql(sql).df()
         except Exception as e:
-            raise RuntimeError(f"DuckDB error: {e}\n\nSQL:\n{sql}")
+            # Retry: feed the error back to the LLM for self-correction
+            retry_messages = messages + [
+                {"role": "assistant", "content": response_text},
+                {"role": "user", "content": (
+                    f"The SQL failed with this error:\n{e}\n\n"
+                    "Fix the SQL and return corrected JSON with 'sql' and 'explanation' fields only."
+                )},
+            ]
+            retry_text = self.call_api(self.system_prompt, retry_messages)
+            try:
+                retry_parsed = json.loads(clean_json_string(retry_text))
+            except (json.JSONDecodeError, ValueError):
+                retry_parsed = self.parse_json_response(retry_text)
+            sql = retry_parsed.get("sql", "").strip()
+            if not sql:
+                raise RuntimeError("LLM returned no SQL on retry")
+            try:
+                df = duckdb.sql(sql).df()
+            except Exception as e2:
+                raise RuntimeError(f"DuckDB error after retry: {e2}\n\nSQL:\n{sql}")
 
         if return_sql:
             return df, sql
@@ -220,8 +240,8 @@ No import statements. No markdown. Return ONLY the JSON object."""
             raise ValueError(f"Unsupported file type: {ext}")
 
         if sql:
-            # Replace 'tbl' placeholder with the actual read expression
-            actual_sql = sql.replace("tbl", read_fn)
+            # Replace 'tbl' as a whole word with the actual read expression
+            actual_sql = re.sub(r'\btbl\b', read_fn, sql)
         else:
             cap = limit or 100_000
             actual_sql = f"SELECT * FROM {read_fn} LIMIT {cap}"
@@ -242,3 +262,43 @@ No import statements. No markdown. Return ONLY the JSON object."""
             for p in sorted(self.data_path.rglob(ext)):
                 files.append(str(p.relative_to(self.data_path)))
         return files
+
+
+class DataLakeChatBot:
+    """
+    Stateful conversational wrapper around DataLakeBot.
+
+    Maintains conversation history so follow-up questions work naturally.
+
+    Usage:
+        bot = DataLakeBot(data_path="/path/to/Data")
+        chat = DataLakeChatBot(bot)
+        result = chat.chat("Which states had the fastest population growth?")
+        result2 = chat.chat("Now show only the top 5")  # uses history
+
+    Each call returns:
+        {'success': True, 'df': pd.DataFrame, 'sql': str, 'row_count': int}
+        or {'success': False, 'error': str}
+    """
+
+    def __init__(self, bot: DataLakeBot):
+        self.bot = bot
+        self._history: List[Dict] = []
+
+    def chat(self, question: str) -> Dict:
+        """Ask a question. Returns a result dict with 'df', 'sql', 'row_count'."""
+        try:
+            df, sql = self.bot.query(question, history=self._history, return_sql=True)
+            self._history.append({"role": "user", "content": question})
+            self._history.append({"role": "assistant", "content": f"Executed SQL. Returned {len(df)} rows."})
+            return {"success": True, "df": df, "sql": sql, "row_count": len(df)}
+        except RuntimeError as e:
+            return {"success": False, "error": str(e)}
+
+    def clear(self):
+        """Reset conversation history."""
+        self._history = []
+
+    @property
+    def history(self) -> List[Dict]:
+        return list(self._history)
