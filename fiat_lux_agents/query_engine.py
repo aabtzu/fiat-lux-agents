@@ -7,6 +7,8 @@ import pandas as pd
 import numpy as np
 import ast
 import json
+from functools import lru_cache
+from urllib.request import urlopen
 try:
     import scipy.stats as _scipy_stats
 except ImportError:
@@ -204,6 +206,32 @@ def execute_query(query_code: str, df: pd.DataFrame, max_rows: int = 1000) -> di
         return {'success': False, 'error': f'Execution error: {str(e)}'}
 
 
+_STATE_SLUGS = {
+    'AL': 'al_alabama', 'AK': 'ak_alaska', 'AZ': 'az_arizona', 'AR': 'ar_arkansas',
+    'CA': 'ca_california', 'CO': 'co_colorado', 'CT': 'ct_connecticut', 'DE': 'de_delaware',
+    'FL': 'fl_florida', 'GA': 'ga_georgia', 'HI': 'hi_hawaii', 'ID': 'id_idaho',
+    'IL': 'il_illinois', 'IN': 'in_indiana', 'IA': 'ia_iowa', 'KS': 'ks_kansas',
+    'KY': 'ky_kentucky', 'LA': 'la_louisiana', 'ME': 'me_maine', 'MD': 'md_maryland',
+    'MA': 'ma_massachusetts', 'MI': 'mi_michigan', 'MN': 'mn_minnesota', 'MS': 'ms_mississippi',
+    'MO': 'mo_missouri', 'MT': 'mt_montana', 'NE': 'ne_nebraska', 'NV': 'nv_nevada',
+    'NH': 'nh_new_hampshire', 'NJ': 'nj_new_jersey', 'NM': 'nm_new_mexico', 'NY': 'ny_new_york',
+    'NC': 'nc_north_carolina', 'ND': 'nd_north_dakota', 'OH': 'oh_ohio', 'OK': 'ok_oklahoma',
+    'OR': 'or_oregon', 'PA': 'pa_pennsylvania', 'RI': 'ri_rhode_island', 'SC': 'sc_south_carolina',
+    'SD': 'sd_south_dakota', 'TN': 'tn_tennessee', 'TX': 'tx_texas', 'UT': 'ut_utah',
+    'VT': 'vt_vermont', 'VA': 'va_virginia', 'WA': 'wa_washington', 'WV': 'wv_west_virginia',
+    'WI': 'wi_wisconsin', 'WY': 'wy_wyoming', 'DC': 'dc_district_of_columbia',
+}
+
+@lru_cache(maxsize=60)
+def _fetch_zip_geojson(state_abbr: str) -> dict:
+    slug = _STATE_SLUGS.get(state_abbr.upper())
+    if not slug:
+        raise ValueError(f"Unknown state abbreviation: {state_abbr}")
+    url = f"https://raw.githubusercontent.com/OpenDataDE/State-zip-code-GeoJSON/master/{slug}_zip_codes_geo.min.json"
+    with urlopen(url) as r:
+        return json.load(r)
+
+
 def execute_fig_code(fig_code: str, df: pd.DataFrame, result: pd.DataFrame = None) -> dict:
     """
     Execute Plotly figure code safely.
@@ -243,6 +271,7 @@ def execute_fig_code(fig_code: str, df: pd.DataFrame, result: pd.DataFrame = Non
         'pd': pd,
         'np': np,
         'scipy_stats': _scipy_stats,
+        'get_zip_geojson': _fetch_zip_geojson,
         **({'sklearn': _sklearn,
             'LinearRegression':      _skl_linear.LinearRegression,
             'LogisticRegression':    _skl_linear.LogisticRegression,

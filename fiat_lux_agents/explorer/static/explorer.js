@@ -80,6 +80,30 @@
         setFeature(name)   { activeFeature = name || null; },
         clearFeature()     { activeFeature = null; },
 
+        _sortTable(tableId, colIdx, th) {
+            const table = document.getElementById(tableId);
+            if (!table) return;
+            const tbody = table.querySelector('tbody');
+            const rows = Array.from(tbody.querySelectorAll('tr'));
+            const asc = th.dataset.sortDir !== 'asc';
+            th.dataset.sortDir = asc ? 'asc' : 'desc';
+
+            // Reset all header icons
+            table.querySelectorAll('.fla-th-sort').forEach(h => {
+                h.querySelector('.fla-sort-icon').textContent = ' ↕';
+            });
+            th.querySelector('.fla-sort-icon').textContent = asc ? ' ↑' : ' ↓';
+
+            rows.sort((a, b) => {
+                const av = a.cells[colIdx]?.textContent.replace(/,/g, '') ?? '';
+                const bv = b.cells[colIdx]?.textContent.replace(/,/g, '') ?? '';
+                const an = parseFloat(av), bn = parseFloat(bv);
+                const cmp = (!isNaN(an) && !isNaN(bn)) ? an - bn : av.localeCompare(bv);
+                return asc ? cmp : -cmp;
+            });
+            rows.forEach(r => tbody.appendChild(r));
+        },
+
         _toggleCode(codeId, btn) {
             const el = $(codeId);
             if (!el) return;
@@ -223,9 +247,12 @@
                 html += `<p class="fla-trunc">Table suppressed (${qr.data.length} rows) — see chart above.</p>`;
             } else {
                 const cols = qr.columns || Object.keys(qr.data[0]);
+                const tableId = 'fla-tbl-' + Date.now();
                 html += '<div class="fla-table-wrap"><h3>Data Table</h3>';
-                html += '<table><thead><tr>';
-                cols.forEach(c => { html += `<th>${escapeHtml(c)}</th>`; });
+                html += `<table id="${tableId}"><thead><tr>`;
+                cols.forEach((c, i) => {
+                    html += `<th class="fla-th-sort" onclick="Explorer._sortTable('${tableId}',${i},this)">${escapeHtml(c)}<span class="fla-sort-icon"> ↕</span></th>`;
+                });
                 html += '</tr></thead><tbody>';
                 qr.data.slice(0, 100).forEach(row => {
                     html += '<tr>';

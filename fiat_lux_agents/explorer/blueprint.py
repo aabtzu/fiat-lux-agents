@@ -66,7 +66,7 @@ def make_explorer_blueprint(
     blueprint_name: str = "explorer",
     show_scope_toggle: bool = False,
     default_scope: str = "all",
-    results_mode: str = "single",
+    results_mode: str = "scroll",
     show_code: bool = True,
     code_preamble: Optional[str] = None,
     show_table: bool = True,

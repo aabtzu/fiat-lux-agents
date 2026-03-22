@@ -92,9 +92,11 @@ Fig_code guidelines:
   GOOD: px.histogram(...)  /  np.mean(...)  /  scipy_stats.mannwhitneyu(...)
 - Pre-imported names: px, go, pd, np, scipy_stats (this IS scipy.stats — use scipy_stats.linregress etc.)
   Also available: LinearRegression, LogisticRegression, Ridge, Lasso, StandardScaler,
-  RandomForestClassifier, RandomForestRegressor, KMeans, r2_score, train_test_split
+  RandomForestClassifier, RandomForestRegressor, KMeans, r2_score, train_test_split,
+  get_zip_geojson (fetches zip code GeoJSON by state abbr, e.g. get_zip_geojson('CA'))
 - DTYPE RULE: always cast get_dummies to float: pd.get_dummies(...).astype(float)
 - Set "fig_code" to null for plain table results with no visualization
+- Tables rendered by the system are sortable by clicking column headers — for "sortable table" requests just return the data as result with fig_code null
 - Available variables: df (full DataFrame), result (from query above, may be None if query is null)
 - MUST assign a Plotly figure to a variable named 'fig'
 - Always regenerate the full chart from scratch — there is no existing figure to modify
