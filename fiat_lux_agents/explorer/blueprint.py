@@ -70,6 +70,7 @@ def make_explorer_blueprint(
     show_code: bool = True,
     code_preamble: Optional[str] = None,
     show_table: bool = True,
+    general_bot=None,
 ) -> ExplorerBlueprint:
     """
     Create a self-contained Flask Blueprint for the data explorer.
@@ -158,6 +159,21 @@ def make_explorer_blueprint(
             return jsonify(agent_response), 500
 
         response_data = agent_response['response']
+
+        # If no code was generated and a general_bot is available, route to it
+        # so general/web-search questions get a proper answer instead of a refusal.
+        if general_bot and not response_data.get('query') and not response_data.get('fig_code'):
+            try:
+                messages = [{'role': t['role'], 'content': t['content']}
+                            for t in conversation_history[-6:]
+                            if t.get('role') in ('user', 'assistant')]
+                messages.append({'role': 'user', 'content': user_message})
+                tools = [{'type': 'web_search_20260209', 'name': 'web_search'}]
+                general_answer = general_bot.call_api(general_bot.system_prompt, messages, tools=tools)
+                if general_answer:
+                    response_data['answer'] = general_answer
+            except Exception:
+                pass  # fall through to original answer on error
 
         # Execute pandas query
         query_result = None

@@ -63,11 +63,9 @@ class LLMBase:
             response = self.client.messages.create(**kwargs)
             if return_full_response:
                 return response
-            # Extract text — works for both plain responses and server-side tool use
-            for block in reversed(response.content):
-                if hasattr(block, "text") and block.text:
-                    return block.text
-            return ""
+            # Concatenate all text blocks — web search responses have many small blocks
+            texts = [block.text for block in response.content if hasattr(block, "text") and block.text]
+            return "".join(texts) if texts else ""
         except Exception as e:
             raise RuntimeError(f"Claude API error: {str(e)}")
 
