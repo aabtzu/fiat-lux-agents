@@ -78,6 +78,20 @@
     text-align: left;
 }
 
+.fla-th-sort {
+    cursor: pointer;
+    user-select: none;
+}
+
+.fla-th-sort:hover {
+    background: #43a047;
+}
+
+.fla-sort-icon {
+    opacity: 0.6;
+    font-size: 11px;
+}
+
 .fla-table-wrap td {
     padding: 7px 12px;
     border-bottom: 1px solid #eee;

@@ -66,9 +66,10 @@ def make_explorer_blueprint(
     blueprint_name: str = "explorer",
     show_scope_toggle: bool = False,
     default_scope: str = "all",
-    results_mode: str = "single",
+    results_mode: str = "scroll",
     show_code: bool = True,
     code_preamble: Optional[str] = None,
+    show_table: bool = True,
 ) -> ExplorerBlueprint:
     """
     Create a self-contained Flask Blueprint for the data explorer.
@@ -96,6 +97,7 @@ def make_explorer_blueprint(
         'show_scope_toggle':  show_scope_toggle,
         'defaultScope':       default_scope,
         'results_mode':       results_mode,   # 'single' | 'scroll'
+        'show_table':         show_table,
     }
 
     bp = ExplorerBlueprint(
@@ -130,7 +132,10 @@ def make_explorer_blueprint(
         conversation_history = _sessions[session_id]
 
         # Get data — caller decides what to return based on scope/filters
-        df = get_dataframe(scope=scope, active_filters=active_filters)
+        try:
+            df = get_dataframe(scope=scope, active_filters=active_filters)
+        except Exception as e:
+            return jsonify({'success': False, 'error': f'Data load error: {str(e)}'}), 500
 
         summary = (
             get_summary(scope=scope, active_filters=active_filters)
@@ -194,6 +199,115 @@ def make_explorer_blueprint(
             'query_result': query_result,
             'code_snippet': code_snippet,
             'metadata':     response_data.get('metadata'),
+        })
+
+    @bp.route('/query/clear', methods=['POST'])
+    def clear_query():
+        data = request.get_json()
+        session_id = data.get('session_id') if data else None
+        if session_id:
+            _sessions.pop(session_id, None)
+        return jsonify({'success': True})
+
+    return bp
+
+
+def make_data_lake_explorer_blueprint(
+    bot,
+    example_questions: Optional[List[Dict]] = None,
+    welcome_title: str = "Data Lake Explorer",
+    welcome_text: str = "Ask questions about your data lake using natural language.",
+    url_prefix: str = "/data-lake-explorer",
+    blueprint_name: str = "data_lake_explorer",
+    results_mode: str = "single",
+    show_code: bool = True,
+) -> ExplorerBlueprint:
+    """
+    Create a self-contained Flask Blueprint for exploring a DataLakeBot.
+
+    The bot executes DuckDB SQL server-side and returns results as a table.
+    Uses the same explorer.js frontend as make_explorer_blueprint.
+
+    Args:
+        bot: A DataLakeBot instance.
+        example_questions: List of {"label": str, "question": str} dicts.
+        url_prefix: URL prefix for the blueprint's routes.
+        blueprint_name: Flask blueprint name.
+
+    Returns:
+        ExplorerBlueprint with .explorer_config dict for template rendering.
+    """
+    explorer_config = {
+        'query_url':         f'{url_prefix}/query',
+        'clear_url':         f'{url_prefix}/query/clear',
+        'static_url':        f'{url_prefix}/static',
+        'welcome_title':     welcome_title,
+        'welcome_text':      welcome_text,
+        'example_questions': example_questions or [],
+        'show_scope_toggle': False,
+        'defaultScope':      'all',
+        'results_mode':      results_mode,
+        'show_table':        True,
+    }
+
+    bp = ExplorerBlueprint(
+        blueprint_name,
+        __name__,
+        template_folder='templates',
+        static_folder='static',
+        static_url_path='/static',
+        explorer_config=explorer_config,
+    )
+
+    _sessions: Dict[str, List] = {}
+
+    @bp.route('/query', methods=['POST'])
+    def query():
+        data = request.get_json()
+        if not data or 'message' not in data:
+            return jsonify({'success': False, 'error': 'Missing message'}), 400
+
+        user_message = data['message'].strip()
+        if not user_message:
+            return jsonify({'success': False, 'error': 'Empty message'}), 400
+
+        session_id = data.get('session_id') or f"s_{datetime.utcnow().timestamp()}"
+        if session_id not in _sessions:
+            _sessions[session_id] = []
+        history = _sessions[session_id]
+
+        try:
+            df, sql = bot.query(user_message, history=history, return_sql=True)
+        except RuntimeError as e:
+            return jsonify({'success': False, 'error': str(e)}), 500
+
+        history.append({'role': 'user', 'content': user_message})
+        history.append({'role': 'assistant', 'content': f'Returned {len(df)} rows.'})
+
+        # Convert df to the standard query_result shape
+        max_rows = 1000
+        truncated = len(df) > max_rows
+        rows = df.head(max_rows).to_dict('records')
+        query_result = {
+            'success': True,
+            'data': rows,
+            'columns': list(df.columns),
+            'row_count': len(df),
+            'truncated': truncated,
+        }
+
+        code_snippet = sql if show_code else None
+
+        return jsonify({
+            'success':      True,
+            'session_id':   session_id,
+            'answer':       f'{len(df):,} rows returned.',
+            'fig_json':     None,
+            'fig_error':    None,
+            'query_error':  None,
+            'query_result': query_result,
+            'code_snippet': code_snippet,
+            'metadata':     {'model': bot.model, 'timestamp': datetime.utcnow().isoformat()},
         })
 
     @bp.route('/query/clear', methods=['POST'])

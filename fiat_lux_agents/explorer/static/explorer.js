@@ -22,6 +22,34 @@
     let historyDraft    = '';   // saves current draft when user starts browsing
     let activeFeature   = null; // optional feature column to focus queries on
 
+    // ── localStorage persistence ─────────────────────────────────────────────
+    // Keyed by query_url so each explorer blueprint has its own slot.
+
+    const STORE_KEY = 'fla_state_' + QUERY_URL;
+
+    function _saveState(lastResult) {
+        try {
+            const msgs = $('fla-messages');
+            localStorage.setItem(STORE_KEY, JSON.stringify({
+                sessionId,
+                inputHistory,
+                messagesHtml: msgs ? msgs.innerHTML : '',
+                lastResult: lastResult || null,
+            }));
+        } catch (_) {}
+    }
+
+    function _loadState() {
+        try {
+            const raw = localStorage.getItem(STORE_KEY);
+            return raw ? JSON.parse(raw) : null;
+        } catch (_) { return null; }
+    }
+
+    function _clearState() {
+        try { localStorage.removeItem(STORE_KEY); } catch (_) {}
+    }
+
     // ── DOM helpers ──────────────────────────────────────────────────────────
 
     function $(id) { return document.getElementById(id); }
@@ -51,6 +79,30 @@
 
         setFeature(name)   { activeFeature = name || null; },
         clearFeature()     { activeFeature = null; },
+
+        _sortTable(tableId, colIdx, th) {
+            const table = document.getElementById(tableId);
+            if (!table) return;
+            const tbody = table.querySelector('tbody');
+            const rows = Array.from(tbody.querySelectorAll('tr'));
+            const asc = th.dataset.sortDir !== 'asc';
+            th.dataset.sortDir = asc ? 'asc' : 'desc';
+
+            // Reset all header icons
+            table.querySelectorAll('.fla-th-sort').forEach(h => {
+                h.querySelector('.fla-sort-icon').textContent = ' ↕';
+            });
+            th.querySelector('.fla-sort-icon').textContent = asc ? ' ↑' : ' ↓';
+
+            rows.sort((a, b) => {
+                const av = a.cells[colIdx]?.textContent.replace(/,/g, '') ?? '';
+                const bv = b.cells[colIdx]?.textContent.replace(/,/g, '') ?? '';
+                const an = parseFloat(av), bn = parseFloat(bv);
+                const cmp = (!isNaN(an) && !isNaN(bn)) ? an - bn : av.localeCompare(bv);
+                return asc ? cmp : -cmp;
+            });
+            rows.forEach(r => tbody.appendChild(r));
+        },
 
         _toggleCode(codeId, btn) {
             const el = $(codeId);
@@ -141,6 +193,7 @@
                 sessionId = data.session_id;
                 _renderResult(data);
                 _appendMsg('assistant', data.answer);
+                _saveState(data);
             }
         } catch (err) {
             _removeLoading(loadId);
@@ -165,8 +218,10 @@
             } catch (_) {}
             sessionId = null;
         }
+        inputHistory = [];
         const msgs = $('fla-messages');
         if (msgs) msgs.innerHTML = '';
+        _clearState();
         _showWelcome();
     }
 
@@ -186,15 +241,18 @@
 
         const qr = data.query_result;
         if (qr?.success && Array.isArray(qr.data) && qr.data.length) {
-            // Suppress raw data tables when a chart is present — they are just noise
-            // and in scroll mode they bury previous results. Show a note instead.
-            if (chartId && qr.data.length > 20) {
+            // Suppress raw data tables when a chart is present and show_table is false.
+            // In scroll mode large tables bury previous results; suppress by default when charting.
+            if (chartId && qr.data.length > 20 && cfg.show_table === false) {
                 html += `<p class="fla-trunc">Table suppressed (${qr.data.length} rows) — see chart above.</p>`;
             } else {
                 const cols = qr.columns || Object.keys(qr.data[0]);
+                const tableId = 'fla-tbl-' + Date.now();
                 html += '<div class="fla-table-wrap"><h3>Data Table</h3>';
-                html += '<table><thead><tr>';
-                cols.forEach(c => { html += `<th>${escapeHtml(c)}</th>`; });
+                html += `<table id="${tableId}"><thead><tr>`;
+                cols.forEach((c, i) => {
+                    html += `<th class="fla-th-sort" onclick="Explorer._sortTable('${tableId}',${i},this)">${escapeHtml(c)}<span class="fla-sort-icon"> ↕</span></th>`;
+                });
                 html += '</tr></thead><tbody>';
                 qr.data.slice(0, 100).forEach(row => {
                     html += '<tr>';
@@ -386,6 +444,20 @@
     // ── Init ──────────────────────────────────────────────────────────────────
 
     document.addEventListener('DOMContentLoaded', function () {
+        // Restore persisted state from previous visit
+        const saved = _loadState();
+        if (saved && saved.sessionId) {
+            sessionId    = saved.sessionId;
+            inputHistory = saved.inputHistory || [];
+
+            const msgs = $('fla-messages');
+            if (msgs && saved.messagesHtml) msgs.innerHTML = saved.messagesHtml;
+
+            if (saved.lastResult) {
+                _renderResult(saved.lastResult);
+            }
+        }
+
         const input = $('fla-input');
         if (input) {
             input.addEventListener('keydown', e => {

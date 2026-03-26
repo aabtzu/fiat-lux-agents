@@ -18,10 +18,77 @@ from fiat_lux_agents import (
     FilterBot, FilterEngine, FilterChatBot,
     MLBot,
     make_explorer_blueprint,
+    DataLakeBot, make_data_lake_explorer_blueprint,
 )
 from data import SAMPLE_DATA, SCHEMA, SUMMARY
 
 app = Flask(__name__)
+
+# --- Data lake setup ---
+
+def _setup_data_lake():
+    """Write sample Parquet files for the DataLakeBot demo."""
+    import os
+    lake_dir = os.path.join(os.path.dirname(__file__), 'testlake')
+    emp_dir = os.path.join(lake_dir, 'employees')
+    os.makedirs(emp_dir, exist_ok=True)
+
+    emp_csv = os.path.join(emp_dir, 'employees.csv')
+    if not os.path.exists(emp_csv):
+        pd.DataFrame(SAMPLE_DATA).to_csv(emp_csv, index=False)
+
+    emp_readme = os.path.join(emp_dir, 'README.md')
+    if not os.path.exists(emp_readme):
+        with open(emp_readme, 'w') as f:
+            f.write("""# employees/employees.csv
+
+150 employee records. Columns:
+- id (int): unique employee ID
+- name (str): full name
+- department (str): Engineering, Sales, Marketing, Operations, Finance, HR
+- role (str): Junior, Mid, Senior, Lead, Manager
+- age (int): employee age
+- tenure_years (float): years at company
+- hire_year (int): year hired
+- education (str): High School, Bachelor's, Master's, PhD
+- remote (bool): works remotely
+- hours_per_week (int): weekly hours
+- projects_completed (int): projects completed
+- training_hours (int): hours of training
+- absences (int): days absent
+- performance_score (float 1-5): performance rating
+- satisfaction_score (float 1-5): job satisfaction
+- salary (int): annual salary in USD
+- bonus_pct (float): bonus percentage
+- last_review (str): last performance review result
+- promoted (bool): was promoted
+- churned (bool): left the company
+""")
+
+    return lake_dir
+
+
+_lake_dir = _setup_data_lake()
+_lake_bot = DataLakeBot(data_path=_lake_dir) if DataLakeBot else None
+
+data_lake_bp = make_data_lake_explorer_blueprint(
+    bot=_lake_bot,
+    example_questions=[
+        {'label': 'Avg salary by dept',    'question': 'What is the average salary by department?'},
+        {'label': 'Churn rate by role',    'question': 'What is the churn rate by role?'},
+        {'label': 'Top earners',           'question': 'Show the top 10 earners with their department and role'},
+        {'label': 'Remote vs on-site',     'question': 'Compare average salary and performance score for remote vs on-site employees'},
+        {'label': 'Tenure distribution',   'question': 'Show the distribution of tenure_years in 1-year buckets'},
+        {'label': 'High performers',       'question': 'List employees with performance_score >= 4.5 and their salaries'},
+    ],
+    welcome_title='Employee Data Lake',
+    welcome_text='Query the employee Parquet files using natural language. Results execute via DuckDB.',
+    url_prefix='/data-lake-explorer',
+    blueprint_name='data_lake_explorer',
+) if _lake_bot else None
+
+if data_lake_bp:
+    app.register_blueprint(data_lake_bp, url_prefix='/data-lake-explorer')
 
 # --- State (in-memory, single-user for testing) ---
 filter_engine = FilterEngine()
@@ -80,7 +147,21 @@ def _data_state():
 
 @app.route('/')
 def index():
-    return render_template('index.html', explorer_config=explorer_bp.explorer_config)
+    return render_template(
+        'index.html',
+        explorer_config=explorer_bp.explorer_config,
+        data_lake_config=data_lake_bp.explorer_config if data_lake_bp else None,
+    )
+
+
+@app.route('/datalake')
+def datalake():
+    if not data_lake_bp:
+        return 'DataLakeBot not available (duckdb not installed)', 503
+    return render_template(
+        'datalake.html',
+        explorer_config=data_lake_bp.explorer_config,
+    )
 
 
 # --- Data ---
