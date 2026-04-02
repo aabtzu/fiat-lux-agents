@@ -21,3 +21,5 @@ jobs:
 
       - name: Run tests
         run: python -m pytest tests/ -v
+        env:
+          ANTHROPIC_API_KEY: "test-key-not-used-api-is-mocked"
