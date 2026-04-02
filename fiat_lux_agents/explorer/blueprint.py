@@ -71,6 +71,8 @@ def make_explorer_blueprint(
     code_preamble: Optional[str] = None,
     show_table: bool = True,
     general_bot=None,
+    query_preprocessor: Optional[Callable] = None,
+    response_validator: Optional[Callable] = None,
 ) -> ExplorerBlueprint:
     """
     Create a self-contained Flask Blueprint for the data explorer.
@@ -149,8 +151,10 @@ def make_explorer_blueprint(
             summary['active_feature'] = active_feature
             summary['focus'] = f"The user is specifically exploring the feature '{active_feature}'. Prioritise this column in your analysis."
 
+        augmented_message = query_preprocessor(user_message, df) if query_preprocessor else user_message
+
         agent_response = chat_bot.process_query(
-            user_message=user_message,
+            user_message=augmented_message,
             conversation_history=conversation_history,
             data_summary=summary,
         )
@@ -174,6 +178,10 @@ def make_explorer_blueprint(
                     response_data['answer'] = general_answer
             except Exception:
                 pass  # fall through to original answer on error
+
+        # Allow caller to validate/correct model response before execution
+        if response_validator:
+            response_data = response_validator(user_message, response_data, df) or response_data
 
         # Execute pandas query
         query_result = None

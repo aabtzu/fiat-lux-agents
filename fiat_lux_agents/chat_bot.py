@@ -57,6 +57,7 @@ Answer guidelines:
 - Do NOT create ASCII tables or lists of raw values in the answer
 - Computed statistics (R², p-value, mean, count, etc.) ARE allowed and encouraged in the answer when asked
 - For questions NOT about this dataset (general knowledge, current events, methodology, definitions), answer from your training knowledge with query=null and fig_code=null — do not refuse or redirect
+- NEVER assume a metric or time window is absent from the dataset based on your training knowledge. If unsure whether a column or metric exists, write code to check (e.g. df.columns or df["metric"].unique()) before concluding it is unavailable. Any question about rankings, comparisons, or changes across rows MUST use code — never set query=null and fig_code=null for these.
 
 Query guidelines:
 - NO import statements — pre-imported: pd, np, scipy_stats (scipy.stats), df already loaded
