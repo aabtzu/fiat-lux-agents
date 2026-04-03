@@ -129,6 +129,7 @@ def make_explorer_blueprint(
         scope = data.get('scope', 'all')
         active_filters = data.get('active_filters') or None
         active_feature = data.get('active_feature') or None
+        verbosity = data.get('verbosity') or None  # 'brief' | 'detailed' | None
 
         if session_id not in _sessions:
             _sessions[session_id] = []
@@ -150,6 +151,12 @@ def make_explorer_blueprint(
         if active_feature:
             summary['active_feature'] = active_feature
             summary['focus'] = f"The user is specifically exploring the feature '{active_feature}'. Prioritise this column in your analysis."
+
+        # Inject verbosity preference
+        if verbosity == 'brief':
+            summary['response_style'] = "Be concise. Answer in 1-3 sentences maximum. Skip elaboration, caveats, and background context unless directly asked."
+        elif verbosity == 'detailed':
+            summary['response_style'] = "Be thorough. Explain your findings in detail with context and caveats."
 
         augmented_message = query_preprocessor(user_message, df) if query_preprocessor else user_message
 

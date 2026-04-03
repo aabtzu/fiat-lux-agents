@@ -22,6 +22,10 @@
     let historyDraft    = '';   // saves current draft when user starts browsing
     let activeFeature   = null; // optional feature column to focus queries on
 
+    // Verbosity preference — persisted in localStorage across sessions
+    const VERBOSITY_KEY = 'fla_verbosity_' + QUERY_URL;
+    let verbosity = localStorage.getItem(VERBOSITY_KEY) || 'detailed';
+
     // ── localStorage persistence ─────────────────────────────────────────────
     // Keyed by query_url so each explorer blueprint has its own slot.
 
@@ -103,6 +107,14 @@
 
         setFeature(name)   { activeFeature = name || null; },
         clearFeature()     { activeFeature = null; },
+
+        setVerbosity(v) {
+            verbosity = v;
+            localStorage.setItem(VERBOSITY_KEY, v);
+            document.querySelectorAll('.fla-verbosity-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.verbosity === v);
+            });
+        },
 
         _sortTable(tableId, colIdx, th) {
             const table = document.getElementById(tableId);
@@ -203,6 +215,7 @@
                     scope,
                     active_filters: activeFilters,
                     active_feature: activeFeature,
+                    verbosity,
                 }),
                 signal: abortCtrl.signal,
             });
@@ -513,6 +526,11 @@
             });
         }
         if (cfg.defaultScope) _setScope(cfg.defaultScope);
+
+        // Restore verbosity toggle state
+        document.querySelectorAll('.fla-verbosity-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.verbosity === verbosity);
+        });
     });
 
 }());
