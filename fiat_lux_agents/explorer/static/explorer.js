@@ -60,6 +60,30 @@
         return d.innerHTML;
     }
 
+    function renderMarkdown(text) {
+        // Escape HTML first, then apply markdown patterns
+        let s = escapeHtml(text);
+        // Bold
+        s = s.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+        // Inline code
+        s = s.replace(/`([^`]+)`/g, '<code>$1</code>');
+        // Numbered lists: lines starting with "1. " "2. " etc.
+        s = s.replace(/((?:^\d+\.\s.+$\n?)+)/gm, (block) => {
+            const items = block.trim().split(/\n/).map(l => `<li>${l.replace(/^\d+\.\s/, '')}</li>`).join('');
+            return `<ol>${items}</ol>`;
+        });
+        // Bullet lists: lines starting with "- " or "* "
+        s = s.replace(/((?:^[-*]\s.+$\n?)+)/gm, (block) => {
+            const items = block.trim().split(/\n/).map(l => `<li>${l.replace(/^[-*]\s/, '')}</li>`).join('');
+            return `<ul>${items}</ul>`;
+        });
+        // Paragraphs: double newlines
+        s = s.replace(/\n{2,}/g, '</p><p>');
+        // Single newlines
+        s = s.replace(/\n/g, '<br>');
+        return `<p>${s}</p>`;
+    }
+
     // ── Public API (called from inline onclick) ───────────────────────────────
 
     window.Explorer = {
@@ -237,7 +261,7 @@
     // ── Build result HTML (shared between modes) ──────────────────────────────
 
     function _buildResultHtml(data, chartId) {
-        let html = `<div class="fla-answer">${escapeHtml(data.answer)}</div>`;
+        let html = `<div class="fla-answer">${renderMarkdown(data.answer)}</div>`;
 
         const qr = data.query_result;
         if (qr?.success && Array.isArray(qr.data) && qr.data.length) {
