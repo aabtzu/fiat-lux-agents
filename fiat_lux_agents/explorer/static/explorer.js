@@ -352,12 +352,18 @@
             if (!div) return;
             try {
                 const fig = JSON.parse(fig_json);
+                // Horizontal bar charts need a wide left margin for long labels (e.g. metro names)
+                const isHBar = (fig.data || []).some(t => t.type === 'bar' && t.orientation === 'h');
+                const defaultMargin = isHBar
+                    ? { t: 40, r: 30, b: 40, l: 190 }
+                    : { t: 50, r: 30, b: 60, l: 60 };
                 const layout = Object.assign({
-                    margin: { t: 50, r: 20, b: 60, l: 60 },
+                    margin: defaultMargin,
                     paper_bgcolor: 'white',
                     plot_bgcolor: '#fafafa',
                     font: { size: 12 },
-                }, fig.layout || {});
+                    autosize: true,
+                }, fig.layout || {}, { margin: defaultMargin });  // margin always wins — model values often too small
                 Plotly.newPlot(div, fig.data || [], layout, { responsive: true, displayModeBar: false });
             } catch (e) {
                 div.innerHTML = `<p class="fla-chart-err">Chart render error: ${escapeHtml(e.message)}</p>`;
