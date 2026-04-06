@@ -325,6 +325,49 @@ Requires `ANTHROPIC_API_KEY` in your environment.
 
 ---
 
+## Starting a New App
+
+The fastest way to start a new app on top of fiat-lux-agents is the scaffold script. It creates the standard project structure, copies the `CLAUDE.md` template (so Claude Code has the right rules from message one), and wires up Flask, gunicorn, CI, and Render config:
+
+```bash
+git clone https://github.com/aabtzu/fiat-lux-agents
+cd fiat-lux-agents
+./scripts/new-app.sh my-app ~/repos/my-app
+```
+
+This gives you:
+
+```
+my-app/
+├── CLAUDE.md                  ← rules for Claude Code (customise for your app)
+├── app.py                     ← Flask factory
+├── agents/
+│   └── common/flask_utils.py  ← require_auth, json_ok, json_err
+├── database/
+│   ├── __init__.py
+│   └── connection.py          ← get_db, init_db, PG + SQLite
+├── static/{js,css}/
+├── templates/
+├── tests/conftest.py
+├── dev.sh                     ← start / test / lint
+├── render.yaml                ← Render deployment config
+├── .github/workflows/ci.yml   ← ruff + pytest CI
+├── requirements.txt
+└── pyproject.toml             ← ruff config
+```
+
+Then:
+```bash
+cd ~/repos/my-app
+python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
+# add ANTHROPIC_API_KEY to .env
+./dev.sh start
+```
+
+Before deploying to Render, set `SECRET_KEY` and `ANTHROPIC_API_KEY` in the Render dashboard (never commit these). See `docs/app-claude-template.md` for the full conventions reference.
+
+---
+
 ## Test App
 
 A working Flask app with sample sales data demonstrating all bots:

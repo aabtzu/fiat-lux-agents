@@ -98,3 +98,12 @@ Changes here affect every app that depends on it — be conservative with breaki
 - The `testapp/` is a Flask app — see `docs/app-claude-template.md` for Flask conventions
 - Its purpose is to demonstrate and test the library, not to be a production app
 - Keep it in sync with the library's public API
+
+---
+
+## Starting a New App
+- **IMPORTANT**: when asked to scaffold or start a new app based on fiat-lux-agents, the very
+  first action must be to run `scripts/new-app.sh <app-name> <target-dir>` — this copies
+  the `CLAUDE.md` template and creates the standard project skeleton
+- Never start writing app code without a `CLAUDE.md` in place — it governs all subsequent work
+- The template lives at `docs/app-claude-template.md`; review it before starting
