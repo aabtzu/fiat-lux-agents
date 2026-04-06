@@ -308,6 +308,33 @@ Completely generic — no assumptions about chart type. The caller describes the
 
 ---
 
+## When to use fiat-lux-agents
+
+Not every LLM call in your app needs to go through fiat-lux-agents. The question to ask: **would I build this the same way in another app?**
+
+**Use fiat-lux-agents when:**
+- The feature involves a **tool use loop** — Claude calls tools, gets results, reasons again, repeats
+- The pattern is **reusable across apps** — summarization, explore chat, document parsing, filtering
+- An **existing bot already fits** — `SummaryBot`, `FilterBot`, `ExplorerBlueprint`, etc.
+
+**Go direct (raw Anthropic API) when:**
+- It's a **single LLM call** with app-specific logic that won't be reused
+- Simple **Q&A over data** — one system prompt, one user message, one reply
+- A one-off feature where fla indirection would just obscure what the code is doing
+
+**The rough mental model:**
+
+| Situation | Approach |
+|---|---|
+| Single call, app-specific | Raw `anthropic.messages.create()` |
+| Single call, reusable pattern | Add to fiat-lux-agents as a new bot |
+| Tool use loop | fiat-lux-agents (`LLMBase` handles the loop) |
+| Multiple agents coordinating | fiat-lux-agents |
+
+The anti-pattern is reaching for fiat-lux-agents by default because it feels more "proper." Every layer of abstraction has a cost in readability and debugging. fiat-lux-agents earns its complexity when the pattern recurs across apps or when tool loops make direct calls unwieldy.
+
+---
+
 ## Installation
 
 ```bash
