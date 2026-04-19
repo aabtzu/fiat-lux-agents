@@ -174,11 +174,24 @@ Writing samples:
         vocab = profile.get("vocabulary", [])
         emphasis = profile.get("emphasis", "practical details")
         perspective = profile.get("perspective", "second person")
-        quirks = profile.get("quirks", "")
+        raw_quirks = profile.get("quirks", "")
+        # Format quirks as enforceable bullet points
+        if isinstance(raw_quirks, list):
+            quirks = "\n".join(f"- {q}" for q in raw_quirks)
+        elif "," in raw_quirks and len(raw_quirks) > 50:
+            # Split comma-separated quirks into bullets
+            quirks = "\n".join(f"- {q.strip()}" for q in raw_quirks.split(",") if q.strip())
+        else:
+            quirks = raw_quirks
+        rules = profile.get("rules", "")
 
         vocab_str = ", ".join(f'"{v}"' for v in vocab[:10]) if vocab else "standard"
 
         extra = f"\n\nAdditional instructions:\n{instructions}" if instructions else ""
+
+        rules_section = ""
+        if rules:
+            rules_section = f"\n\nRULES (follow these strictly):\n{rules}"
 
         return f"""You are a writer matching a specific voice and style.
 
@@ -188,12 +201,9 @@ Style characteristics:
 - Vocabulary/shortcuts: {vocab_str}
 - Emphasize: {emphasis}
 - Perspective: {perspective}
-- Other patterns: {quirks}
+- Style rules (follow each one):
+{quirks}
 
-CRITICAL RULES:
-- Match this style exactly — tone, sentence length, word choices, what gets emphasized
-- Do NOT sound like a generic AI — sound like the person described above
-- Do NOT add filler wrap-up phrases at the end of recommendations (e.g. "worth it", \
-"you earned it", "that's the move", "just a solid stop") — state the fact and stop
-- Each recommendation should end with the last useful detail, not a summary judgment
-{extra}"""
+Match this style exactly — tone, sentence length, word choices, what gets \
+emphasized. Do NOT sound like a generic AI. Sound like the person described above.
+{rules_section}{extra}"""
