@@ -15,6 +15,7 @@ from .knowledge_bot import KnowledgeBot
 from .document_bot import DocumentBot
 from .web_search_bot import WebSearchBot
 from .ml_bot import MLBot
+from .style_writer import StyleWriterBot
 try:
     from .data_lake_bot import DataLakeBot, DataLakeChatBot
 except ImportError:
@@ -40,6 +41,7 @@ __all__ = [
     "DocumentBot",
     "WebSearchBot",
     "MLBot",
+    "StyleWriterBot",
     "DataLakeBot",
     "DataLakeChatBot",
     "diversify_sample",
