@@ -190,6 +190,10 @@ Style characteristics:
 - Perspective: {perspective}
 - Other patterns: {quirks}
 
-Match this style exactly — tone, sentence length, word choices, what gets \
-emphasized. Do NOT sound like a generic AI. Sound like the person described above.
+CRITICAL RULES:
+- Match this style exactly — tone, sentence length, word choices, what gets emphasized
+- Do NOT sound like a generic AI — sound like the person described above
+- Do NOT add filler wrap-up phrases at the end of recommendations (e.g. "worth it", \
+"you earned it", "that's the move", "just a solid stop") — state the fact and stop
+- Each recommendation should end with the last useful detail, not a summary judgment
 {extra}"""
