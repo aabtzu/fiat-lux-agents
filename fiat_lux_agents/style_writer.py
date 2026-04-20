@@ -114,6 +114,7 @@ Writing samples:
         style_profile: Optional[Dict] = None,
         style_template: Optional[str] = None,
         instructions: str = "",
+        writing_samples: str = "",
     ) -> str:
         """Generate text in a specific style from structured data.
 
@@ -128,6 +129,9 @@ Writing samples:
                 ('nyt_36_hours', 'casual_email'). Used if no style_profile.
             instructions: Additional instructions for the generation
                 (e.g. "Group by area, include links as markdown")
+            writing_samples: Actual text written by the person whose style
+                to match. Included as few-shot examples — much more effective
+                than style descriptions alone.
 
         Returns:
             Generated text string.
@@ -141,6 +145,19 @@ Writing samples:
 
         system = self._build_system_prompt(profile, instructions)
 
+        # Build messages — include writing samples as examples if available
+        messages = []
+        if writing_samples:
+            messages.append({
+                "role": "user",
+                "content": "Here are examples of how I write. Match this voice exactly:\n\n"
+                + writing_samples,
+            })
+            messages.append({
+                "role": "assistant",
+                "content": "Got it — I'll match your writing style, tone, and patterns exactly.",
+            })
+
         # Format data
         if isinstance(data, (dict, list)):
             data_str = json.dumps(data, indent=2, default=str)
@@ -148,10 +165,11 @@ Writing samples:
             data_str = str(data)
 
         prompt = context + "\n\nData:\n" + data_str if context else data_str
+        messages.append({"role": "user", "content": prompt})
 
         response = self.call_api(
             system_prompt=system,
-            messages=[{"role": "user", "content": prompt}],
+            messages=messages,
             return_full_response=True,
         )
         return response.content[0].text.strip()
