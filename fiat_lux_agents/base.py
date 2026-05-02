@@ -27,7 +27,7 @@ def clean_json_string(json_str):
 class LLMBase:
     """Base class for all Claude-powered bots."""
 
-    def __init__(self, model=DEFAULT_MODEL, max_tokens=4000):
+    def __init__(self, model=DEFAULT_MODEL, max_tokens=4000, instructions=None):
         api_key = os.getenv('ANTHROPIC_API_KEY')
         if not api_key or api_key == 'your_api_key_here':
             raise ValueError(
@@ -37,6 +37,7 @@ class LLMBase:
         self.client = anthropic.Anthropic(api_key=api_key)
         self.model = model
         self.max_tokens = max_tokens
+        self.instructions = instructions
 
     def call_api(self, system_prompt, messages, return_full_response=False, tools=None):
         """
@@ -52,10 +53,18 @@ class LLMBase:
             Response text string, or full response object if return_full_response=True
         """
         try:
+            effective_system = system_prompt
+            if self.instructions:
+                effective_system = (
+                    f"{system_prompt}\n\n"
+                    f"---\n"
+                    f"Persistent instructions from the user (apply to every turn):\n"
+                    f"{self.instructions}"
+                )
             kwargs = dict(
                 model=self.model,
                 max_tokens=self.max_tokens,
-                system=system_prompt,
+                system=effective_system,
                 messages=messages,
             )
             if tools:
