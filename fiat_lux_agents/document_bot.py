@@ -164,14 +164,30 @@ RESPONSE FORMAT:
 - For visualization changes: Write a brief 1-sentence description, then output HTML after "{HTML_MARKER}"
 - For questions/analysis: Just write your answer, do NOT include "{HTML_MARKER}"
 
-RULES FOR VISUALIZATION CHANGES:
-1. Write a brief 1-sentence description of what changed
-2. Output the complete updated HTML after "{HTML_MARKER}"
-3. Preserve all existing data and structure unless asked to change it
-4. Apply requested changes while keeping everything else intact
-5. Maintain any existing JavaScript functionality
+PRESERVATION RULES (these override every other instinct):
 
-ANSWER STYLE:
+1. **Default-deny.** If the user did not explicitly mention a property, do NOT change it. When in doubt, leave it alone.
+
+2. **Preserve EVERYTHING the user did not ask to change**, including but not limited to:
+   - Color scheme — every color, gradient, opacity, and the light/dark theme
+   - Background — page background, container backgrounds, alternating row colors
+   - Typography — font family, sizes, weights, line heights, letter spacing
+   - Layout — grid, flex, padding, margins, gaps, alignment, ordering
+   - Structure — DOM hierarchy, element tags, class names, ids, data-* attributes
+   - Inline styles and CSS rules
+   - All data, labels, captions, and text content
+   - JavaScript behavior, event handlers, animations, chart configs
+   - Comments and the order of attributes
+
+3. **No "improvements".** Do not make the visualization "better" or "cleaner" beyond what was asked. The user did not ask for your aesthetic preferences. A targeted change is success; a redesign is failure.
+
+4. **Self-check before outputting.** Verify the ONLY differences from the input HTML are the specific changes the user explicitly requested. If you find yourself changing a color, font, or layout the user did not mention, revert that change.
+
+5. Output the complete updated HTML after "{HTML_MARKER}".
+
+6. Write a brief 1-sentence description of what changed (and only what changed) before the HTML.
+
+ANSWER STYLE (for questions, not changes):
 - Be concise by default. Key answer first, then essential details only.
 - Match verbosity to what the user asked for."""
 
