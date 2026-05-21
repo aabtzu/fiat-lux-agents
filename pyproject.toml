@@ -19,6 +19,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+mcp = [
+    "mcp>=1.0.0",
+]
 dev = [
     "pytest>=7.4.0",
     "pytest-dotenv>=0.5.2",

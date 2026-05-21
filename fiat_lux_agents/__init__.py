@@ -22,6 +22,11 @@ except ImportError:
     DataLakeBot = None
     DataLakeChatBot = None
 
+try:
+    from .mcp_client import MCPClient
+except ImportError:
+    MCPClient = None
+
 __all__ = [
     "LLMBase",
     "clean_json_string",
@@ -47,4 +52,5 @@ __all__ = [
     "diversify_sample",
     "make_explorer_blueprint",
     "make_data_lake_explorer_blueprint",
+    "MCPClient",
 ]
