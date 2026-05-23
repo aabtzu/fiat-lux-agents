@@ -246,7 +246,7 @@ CMD="${1:-start}"
 
 case "$CMD" in
   start)
-    AUTH_DISABLED=true SECRET_KEY=dev python3 app.py
+    AUTH_DISABLED=true SECRET_KEY=dev .venv/bin/python3 app.py
     ;;
   test)
     .venv/bin/python3 -m pytest tests/ -x -q "$@"
@@ -316,7 +316,8 @@ echo "Done! Your app is at: $TARGET"
 echo ""
 echo "Next steps:"
 echo "  cd $TARGET"
-echo "  python3 -m venv .venv && .venv/bin/pip install -r requirements.txt"
+echo "  python3 -m venv .venv"
+echo "  .venv/bin/pip install -r requirements.txt"
 echo "  cp .env.example .env  # then add ANTHROPIC_API_KEY"
 echo "  ./dev.sh start"
 echo ""
