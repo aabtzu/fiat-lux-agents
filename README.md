@@ -44,6 +44,7 @@ All of that — chart generation, pandas code execution, conversation history, s
 | [DocumentBot](#documentbot) | Generates HTML visualizations or answers questions from raw unstructured document text |
 | [KnowledgeBot](#knowledgebot) | Answers questions from a curated domain knowledge base; returns markdown |
 | [WebSearchBot](#websearchbot) | Searches the web or fetches a URL using Anthropic's built-in tools |
+| [MCPClient](#mcpclient) | Sync-friendly client for calling tools on a remote MCP server over SSE/HTTP |
 | [ChartDigitizerBot](#chartdigitizerbot) | Extracts data series from chart images with iterative self-correction |
 
 ---
@@ -281,6 +282,45 @@ answer = bot.fetch("https://example.com/product", question="What is the price?")
 
 ---
 
+### MCPClient
+Sync-friendly client for calling tools on a remote MCP server over SSE/HTTP. Wraps the async Python MCP SDK so Flask routes and background threads can make MCP calls without managing an event loop.
+
+```python
+from fiat_lux_agents import MCPClient
+
+client = MCPClient(
+    url="https://example.com/mcp/server",
+    token="your-bearer-token",   # optional Bearer token
+    timeout=60.0,                # per-call timeout in seconds
+)
+
+# List available tools in Anthropic tool_use format
+tools = client.list_tools()
+# [{"name": "search_cases", "description": "...", "input_schema": {...}}, ...]
+
+# Call a tool — always returns a string
+result = client.call_tool("search_cases", {"input": '{"query": "finance"}'})
+```
+
+Each `call_tool` / `list_tools` call opens a fresh SSE connection and closes it — stateless and safe to use from multiple threads. Requires the `mcp` package (`pip install mcp`); apps that don't need MCP can import fiat-lux-agents without it.
+
+**Typical pattern in a Flask app** — call from a background thread so the route returns immediately:
+
+```python
+import threading
+from fiat_lux_agents import MCPClient
+
+def run_search(brief_id, query):
+    client = MCPClient(url=MCP_URL, token=MCP_TOKEN)
+    result = client.call_tool("search_cases", {"input": json.dumps({"query": query})})
+    db.save_result(brief_id, result)
+
+t = threading.Thread(target=run_search, args=(brief_id, query), daemon=True)
+t.start()
+```
+
+---
+
 ### ChartDigitizerBot
 Self-correcting scientific chart digitizer. Extracts numerical data series from chart images using a multi-pass feedback loop: extracts data, renders a comparison overlay, then asks Claude to fix gaps and missed peaks — repeating until the result stabilizes.
 
@@ -446,6 +486,10 @@ KnowledgeBot               → curated knowledge base → markdown Q&A answers
 WebSearchBot               → live internet queries → plain text answers
     ├── search()           → web search via Anthropic's built-in tools
     └── fetch()            → fetch + summarize a specific URL
+
+MCPClient                  → call tools on a remote MCP server (sync wrapper)
+    ├── list_tools()       → available tools in Anthropic format
+    └── call_tool()        → invoke a named tool, return string result
 
 ChartDigitizerBot          → chart image → extracted data series (JSON)
     ├── pass 1             → initial extraction from image
