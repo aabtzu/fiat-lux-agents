@@ -261,10 +261,12 @@ class TestTokens:
 
 
 class TestResetPasswordRoutes:
-    def test_forgot_password_unknown_email_still_200(self, client):
+    def test_forgot_password_unknown_email_returns_error(self, client):
         r = client.post("/api/forgot-password", json={"email": "nobody@example.com"})
-        assert r.status_code == 200
-        assert r.get_json()["success"] is True
+        assert r.status_code == 400
+        data = r.get_json()
+        assert data["success"] is False
+        assert "No account" in data["error"]
 
     def test_forgot_password_sends_for_known_email(self, auth_db, client, monkeypatch):
         import fiat_lux_agents.auth.email as mailer

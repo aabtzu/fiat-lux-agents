@@ -67,18 +67,14 @@ def forgot_password(
     from_email: str,
     app_name: str = "Libertas",
 ) -> tuple[bool, str | None]:
-    """Look up user by email, send reset link. Returns (sent, error).
-
-    Always returns (True, None) even if email not found - avoids leaking
-    whether an address is registered.
-    """
+    """Look up user by email, send reset link. Returns (sent, error)."""
     from .tokens import generate_reset_token
     from . import email as mailer
 
     email = email.strip().lower()
     user = db.get_user_by_email(email)
     if not user:
-        return True, None  # silent - don't reveal if email exists
+        return False, "No account found with that email address"
 
     token = generate_reset_token(user["id"], secret_key)
     reset_url = f"{app_url.rstrip('/')}/reset-password.html?token={token}"
