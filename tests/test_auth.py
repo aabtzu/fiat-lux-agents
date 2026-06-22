@@ -47,12 +47,21 @@ def auth_db(mem_db_factory):
     return AuthDB(mem_db_factory, use_postgres=False)
 
 
+_SECRET = "test-secret"
+
+
 @pytest.fixture
 def client(mem_db_factory):
     app = Flask(__name__)
-    app.secret_key = "test-secret"
+    app.secret_key = _SECRET
     app.config["TESTING"] = True
-    bp = make_auth_blueprint(mem_db_factory, use_postgres=False)
+    bp = make_auth_blueprint(
+        mem_db_factory,
+        use_postgres=False,
+        secret_key=_SECRET,
+        app_url="http://localhost",
+        from_email="noreply@test.local",
+    )
     app.register_blueprint(bp)
     with app.test_client() as c:
         yield c
@@ -214,6 +223,89 @@ class TestBlueprint:
         })
         assert r.status_code == 200
         assert r.get_json()["success"] is True
-        # old password no longer works
         assert auth_db.authenticate("nick", "oldpass1") is None
         assert auth_db.authenticate("nick", "newpass1") is not None
+
+
+# ---------------------------------------------------------------------------
+# Token tests
+# ---------------------------------------------------------------------------
+
+
+class TestTokens:
+    def test_valid_token_round_trip(self):
+        from fiat_lux_agents.auth.tokens import generate_reset_token, verify_reset_token
+        token = generate_reset_token(42, "secret")
+        assert verify_reset_token(token, "secret") == 42
+
+    def test_wrong_secret_rejected(self):
+        from fiat_lux_agents.auth.tokens import generate_reset_token, verify_reset_token
+        token = generate_reset_token(42, "secret")
+        assert verify_reset_token(token, "wrong-secret") is None
+
+    def test_expired_token_rejected(self):
+        from fiat_lux_agents.auth.tokens import generate_reset_token, verify_reset_token
+        token = generate_reset_token(42, "secret")
+        assert verify_reset_token(token, "secret", expiry_seconds=0) is None
+
+    def test_tampered_token_rejected(self):
+        from fiat_lux_agents.auth.tokens import generate_reset_token, verify_reset_token
+        token = generate_reset_token(42, "secret")
+        tampered = token[:-4] + "xxxx"
+        assert verify_reset_token(tampered, "secret") is None
+
+
+# ---------------------------------------------------------------------------
+# Reset-password route tests
+# ---------------------------------------------------------------------------
+
+
+class TestResetPasswordRoutes:
+    def test_forgot_password_unknown_email_still_200(self, client):
+        r = client.post("/api/forgot-password", json={"email": "nobody@example.com"})
+        assert r.status_code == 200
+        assert r.get_json()["success"] is True
+
+    def test_forgot_password_sends_for_known_email(self, auth_db, client, monkeypatch):
+        import fiat_lux_agents.auth.email as mailer
+        sent = []
+        monkeypatch.setattr(mailer, "send", lambda *a, **kw: sent.append(a))
+        auth_db.create_user("olivia", "olivia@example.com", "pass123")
+        r = client.post("/api/forgot-password", json={"email": "olivia@example.com"})
+        assert r.status_code == 200
+        assert len(sent) == 1
+        assert "olivia@example.com" in sent[0]
+
+    def test_reset_password_valid_token(self, auth_db, client):
+        from fiat_lux_agents.auth.tokens import generate_reset_token
+        uid = auth_db.create_user("pete", "pete@example.com", "oldpass1")
+        token = generate_reset_token(uid, _SECRET)
+        r = client.post("/api/reset-password", json={
+            "token": token,
+            "new_password": "brandnew1",
+            "confirm_password": "brandnew1",
+        })
+        assert r.status_code == 200
+        assert r.get_json()["success"] is True
+        assert auth_db.authenticate("pete", "brandnew1") is not None
+        assert auth_db.authenticate("pete", "oldpass1") is None
+
+    def test_reset_password_invalid_token(self, client):
+        r = client.post("/api/reset-password", json={
+            "token": "bad.token",
+            "new_password": "brandnew1",
+            "confirm_password": "brandnew1",
+        })
+        assert r.status_code == 400
+        assert "expired" in r.get_json()["error"].lower() or "invalid" in r.get_json()["error"].lower()
+
+    def test_reset_password_mismatch(self, auth_db, client):
+        from fiat_lux_agents.auth.tokens import generate_reset_token
+        uid = auth_db.create_user("quinn", "quinn@example.com", "pass123")
+        token = generate_reset_token(uid, _SECRET)
+        r = client.post("/api/reset-password", json={
+            "token": token,
+            "new_password": "newpass1",
+            "confirm_password": "different1",
+        })
+        assert r.status_code == 400

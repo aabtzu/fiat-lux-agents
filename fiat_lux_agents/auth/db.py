@@ -161,3 +161,14 @@ class AuthDB:
                 (new_hash, user_id),
             )
             return True, None
+
+    def set_password_by_id(self, user_id: int, new_password: str) -> bool:
+        """Set password directly by user ID - used after token verification."""
+        new_hash = hash_password(new_password)
+        with self._get() as conn:
+            cur = conn.cursor()
+            cur.execute(
+                self._p(_SQL_PG_SET_PASSWORD, _SQL_SQ_SET_PASSWORD),
+                (new_hash, user_id),
+            )
+            return cur.rowcount > 0

@@ -59,6 +59,74 @@ def login(
     return user, None
 
 
+def forgot_password(
+    db: AuthDB,
+    email: str,
+    secret_key: str,
+    app_url: str,
+    from_email: str,
+    app_name: str = "Libertas",
+) -> tuple[bool, str | None]:
+    """Look up user by email, send reset link. Returns (sent, error).
+
+    Always returns (True, None) even if email not found - avoids leaking
+    whether an address is registered.
+    """
+    from .tokens import generate_reset_token
+    from . import email as mailer
+
+    email = email.strip().lower()
+    user = db.get_user_by_email(email)
+    if not user:
+        return True, None  # silent - don't reveal if email exists
+
+    token = generate_reset_token(user["id"], secret_key)
+    reset_url = f"{app_url.rstrip('/')}/reset-password.html?token={token}"
+
+    body = f"""
+<p>Hi {user['username']},</p>
+<p>Someone requested a password reset for your {app_name} account.</p>
+<p><a href="{reset_url}" style="background:#667eea;color:white;padding:12px 24px;
+border-radius:8px;text-decoration:none;font-weight:600;">Reset Password</a></p>
+<p>This link expires in 1 hour. If you didn't request this, ignore this email.</p>
+<p>{app_name}</p>
+"""
+    try:
+        mailer.send(email, f"Reset your {app_name} password", body, from_email)
+    except Exception as e:
+        print(f"[fla-auth] email send failed: {e}")
+        return False, "Failed to send reset email - please try again later"
+
+    return True, None
+
+
+def reset_password(
+    db: AuthDB,
+    token: str,
+    new_password: str,
+    confirm_password: str,
+    secret_key: str,
+) -> tuple[bool, str | None]:
+    """Verify token and set new password. Returns (success, error)."""
+    from .tokens import verify_reset_token
+
+    if not new_password or not confirm_password:
+        return False, "All fields are required"
+    if new_password != confirm_password:
+        return False, "Passwords do not match"
+    if len(new_password) < MIN_PASSWORD_LEN:
+        return False, f"Password must be at least {MIN_PASSWORD_LEN} characters"
+
+    user_id = verify_reset_token(token, secret_key)
+    if not user_id:
+        return False, "Reset link is invalid or has expired"
+
+    ok = db.set_password_by_id(user_id, new_password)
+    if not ok:
+        return False, "Failed to reset password"
+    return True, None
+
+
 def change_password(
     db: AuthDB,
     user_id: int,
