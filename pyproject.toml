@@ -22,10 +22,16 @@ dependencies = [
 mcp = [
     "mcp>=1.0.0",
 ]
+auth = [
+    "flask>=3.0.0",
+    "bcrypt>=4.0.0",
+]
 dev = [
     "pytest>=7.4.0",
     "pytest-dotenv>=0.5.2",
     "mcp>=1.0.0",
+    "flask>=3.0.0",
+    "bcrypt>=4.0.0",
 ]
 
 [tool.setuptools.packages.find]
@@ -37,4 +43,5 @@ include = ["fiat_lux_agents*"]
     "explorer/templates/*.html",
     "explorer/static/*.js",
     "explorer/static/*.css",
+    "auth/templates/auth/*.html",
 ]
