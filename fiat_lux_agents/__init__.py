@@ -27,6 +27,11 @@ try:
 except ImportError:
     MCPClient = None
 
+try:
+    from .auth import make_auth_blueprint
+except ImportError:
+    make_auth_blueprint = None
+
 __all__ = [
     "LLMBase",
     "clean_json_string",
@@ -53,4 +58,5 @@ __all__ = [
     "make_explorer_blueprint",
     "make_data_lake_explorer_blueprint",
     "MCPClient",
+    "make_auth_blueprint",
 ]
