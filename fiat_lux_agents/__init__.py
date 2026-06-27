@@ -21,6 +21,7 @@ from .summary_bot import SummaryBot
 from .knowledge_bot import KnowledgeBot
 from .document_bot import DocumentBot
 from .web_search_bot import WebSearchBot
+from .url_fetcher import fetch_url, is_safe_url
 from .ml_bot import MLBot
 from .style_writer import StyleWriterBot
 
@@ -62,6 +63,8 @@ __all__ = [
     "KnowledgeBot",
     "DocumentBot",
     "WebSearchBot",
+    "fetch_url",
+    "is_safe_url",
     "MLBot",
     "StyleWriterBot",
     "DataLakeBot",
