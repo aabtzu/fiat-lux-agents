@@ -26,12 +26,18 @@ auth = [
     "flask>=3.0.0",
     "bcrypt>=4.0.0",
 ]
+web = [
+    "requests>=2.32.0",
+    "trafilatura>=2.0.0",
+]
 dev = [
     "pytest>=7.4.0",
     "pytest-dotenv>=0.5.2",
     "mcp>=1.0.0",
     "flask>=3.0.0",
     "bcrypt>=4.0.0",
+    "requests>=2.32.0",
+    "trafilatura>=2.0.0",
 ]
 
 [tool.setuptools.packages.find]
