@@ -69,6 +69,7 @@ def make_auth_blueprint(
         )
         if error:
             return _err(error, 401 if "Invalid" in error else 400)
+        session.permanent = True
         session["user_id"] = user["id"]
         session["username"] = user["username"]
         return _ok({"username": user["username"]})
