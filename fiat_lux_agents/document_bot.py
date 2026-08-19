@@ -39,7 +39,7 @@ Usage:
 
 import base64
 from typing import Dict, List, Optional, Union
-from .base import LLMBase, DEFAULT_MODEL
+from .base import LLMBase, DEFAULT_MODEL, WEB_SEARCH_TOOL
 
 HTML_MARKER = "---HTML---"
 PYTHON_MARKER = "---PYTHON---"
@@ -179,17 +179,19 @@ SORTABLE TABLES (always do this for tables with more than a few rows):
   </script>
 - Tip: style `th[data-col]:hover {{ opacity: 0.8; }}` to hint that headers are clickable
 
+WEB SEARCH:
+- You have access to web_search. Use it whenever you need information not in the document —
+  merchant locations, store numbers, exchange rates, product details, regulatory codes, etc.
+- Search proactively: if you encounter an ambiguous merchant name or store number, search
+  before guessing. One targeted search ("QFC store 5807 location") is better than a wrong answer.
+- You do not need to mention that you searched; just incorporate the result naturally.
+
 EXPENSE / CHARGE DOCUMENTS (bank statements, credit card statements, expense reports, receipts):
 - Always include a `state` field (2-letter US state abbreviation) in every record in
   `window.DOCUMENT_DATA`, and a corresponding "State" column in the rendered table.
-- Infer the state from the merchant/payee name using your training knowledge:
-    QFC / Quality Food Center → WA
-    Fred Meyer → OR, WA, ID, AK (use region clues if present, else "?")
-    Safeway → varies — use "?" unless city/store number gives a clear signal
-    Trader Joe's → varies — use "?" unless location is clear
-    Costco → use store city/state if visible in the charge description, else "?"
-    Common regional chains: WinCo → PNW; Wegmans → NY/NJ/PA/MD/VA; Publix → SE US
-- If the state cannot be confidently determined, use "?" (not blank, not "Unknown").
+- Use your training knowledge for well-known chains (QFC → WA, WinCo → PNW, Wegmans → NE US).
+- For store numbers or unfamiliar merchants, use web_search to look up the location.
+- If the state truly cannot be determined after searching, use "?" (not blank, not "Unknown").
 - Place the State column after the merchant/description column and before the amount.
 - Include state in any category-summary charts or breakdowns if the user requests it.
 
@@ -211,13 +213,17 @@ RESPONSE FORMAT:
 - For visualization changes: Write a brief 1-sentence description, then output HTML after "{HTML_MARKER}"
 - For questions/analysis: Just write your answer, do NOT include "{HTML_MARKER}"
 
+WEB SEARCH: You have access to web_search. Use it when the user's request requires external
+information (store locations, current prices, facts not in the HTML). Search proactively rather
+than guessing.
+
 SORTABLE TABLES: If the existing HTML already has sortable column headers (th[data-col] attributes
 and a sort script), preserve them exactly. If adding new columns, give them the correct data-col
 index. Do NOT remove sort functionality unless explicitly asked.
 
 STATE COLUMN: If the existing visualization already has a "State" column in an expense table,
-preserve it. If the user asks to add a State column, infer each row's state from the merchant
-name using your training knowledge; use "?" when the state cannot be confidently determined.
+preserve it. If the user asks to add a State column, use web_search for unknown merchants rather
+than guessing; use "?" only when search yields no clear result.
 
 PRESERVATION RULES (these override every other instinct):
 
@@ -431,7 +437,7 @@ Added a bar chart grouping session amounts by month.
     def _call_and_parse(self, system_prompt: str, messages: list) -> Dict:
         """Call the API and parse the ---HTML--- delimited response."""
         try:
-            response_text = self.call_api(system_prompt, messages)
+            response_text = self.call_api(system_prompt, messages, tools=[WEB_SEARCH_TOOL])
         except Exception as e:
             return {"message": f"I couldn't process that: {str(e)}", "html": None}
 
