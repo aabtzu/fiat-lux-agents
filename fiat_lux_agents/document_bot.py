@@ -136,15 +136,62 @@ DATA-DRIVEN APPROACH (critical — always do this):
 - Example:
   <script>
     window.DOCUMENT_DATA = [
-      {{date: "2025-01-01", description: "Item 1", amount: 100}},
+      {{date: "2025-01-01", description: "Item 1", amount: 100, state: "WA"}},
     ];
     function render() {{
       document.getElementById('body').innerHTML =
-        window.DOCUMENT_DATA.map(r => `<tr><td>${{r.date}}</td><td>${{r.description}}</td><td>$${{r.amount}}</td></tr>`).join('');
+        window.DOCUMENT_DATA.map(r => `<tr><td>${{r.date}}</td><td>${{r.description}}</td><td>$${{r.amount}}</td><td>${{r.state}}</td></tr>`).join('');
     }}
     document.addEventListener('DOMContentLoaded', render);
   </script>
 - Keeps HTML compact regardless of data size; enables fast chart additions later
+
+SORTABLE TABLES (always do this for tables with more than a few rows):
+- Add `data-col="N"` (0-indexed) to every `<th>` and include this sort script once per page:
+  <script>
+    (function() {{
+      document.querySelectorAll('th[data-col]').forEach(th => {{
+        th.style.cursor = 'pointer';
+        th.title = 'Click to sort';
+        th.addEventListener('click', function() {{
+          const col = +this.dataset.col;
+          const tbody = this.closest('table').querySelector('tbody');
+          const rows = Array.from(tbody.rows);
+          const asc = this.dataset.order !== 'asc';
+          rows.sort((a, b) => {{
+            const va = a.cells[col]?.textContent.trim() ?? '';
+            const vb = b.cells[col]?.textContent.trim() ?? '';
+            const na = parseFloat(va.replace(/[^0-9.-]/g, ''));
+            const nb = parseFloat(vb.replace(/[^0-9.-]/g, ''));
+            if (!isNaN(na) && !isNaN(nb)) return asc ? na - nb : nb - na;
+            return asc ? va.localeCompare(vb) : vb.localeCompare(va);
+          }});
+          rows.forEach(r => tbody.appendChild(r));
+          this.closest('table').querySelectorAll('th[data-col]').forEach(t => {{
+            t.textContent = t.textContent.replace(/ [▲▼]$/, '');
+            delete t.dataset.order;
+          }});
+          this.textContent += asc ? ' ▲' : ' ▼';
+          this.dataset.order = asc ? 'asc' : 'desc';
+        }});
+      }});
+    }})();
+  </script>
+- Tip: style `th[data-col]:hover {{ opacity: 0.8; }}` to hint that headers are clickable
+
+EXPENSE / CHARGE DOCUMENTS (bank statements, credit card statements, expense reports, receipts):
+- Always include a `state` field (2-letter US state abbreviation) in every record in
+  `window.DOCUMENT_DATA`, and a corresponding "State" column in the rendered table.
+- Infer the state from the merchant/payee name using your training knowledge:
+    QFC / Quality Food Center → WA
+    Fred Meyer → OR, WA, ID, AK (use region clues if present, else "?")
+    Safeway → varies — use "?" unless city/store number gives a clear signal
+    Trader Joe's → varies — use "?" unless location is clear
+    Costco → use store city/state if visible in the charge description, else "?"
+    Common regional chains: WinCo → PNW; Wegmans → NY/NJ/PA/MD/VA; Publix → SE US
+- If the state cannot be confidently determined, use "?" (not blank, not "Unknown").
+- Place the State column after the merchant/description column and before the amount.
+- Include state in any category-summary charts or breakdowns if the user requests it.
 
 JAVASCRIPT RULES:
 - Prefer CSS-only solutions (hover, :target, details/summary) over JS when possible
@@ -163,6 +210,14 @@ Start with a reasonable default visualization for the document type, then refine
 RESPONSE FORMAT:
 - For visualization changes: Write a brief 1-sentence description, then output HTML after "{HTML_MARKER}"
 - For questions/analysis: Just write your answer, do NOT include "{HTML_MARKER}"
+
+SORTABLE TABLES: If the existing HTML already has sortable column headers (th[data-col] attributes
+and a sort script), preserve them exactly. If adding new columns, give them the correct data-col
+index. Do NOT remove sort functionality unless explicitly asked.
+
+STATE COLUMN: If the existing visualization already has a "State" column in an expense table,
+preserve it. If the user asks to add a State column, infer each row's state from the merchant
+name using your training knowledge; use "?" when the state cannot be confidently determined.
 
 PRESERVATION RULES (these override every other instinct):
 
