@@ -150,7 +150,9 @@ WEB SEARCH:
 - You have access to web_search. Use it whenever the user's request or the document requires
   external information — merchant locations, store numbers, current prices, regulatory codes, etc.
 - Search proactively rather than guessing. One targeted search is better than a wrong answer.
-- Incorporate results naturally; no need to announce that you searched.
+- After searching, do NOT narrate your findings or list them before the HTML. Embed all
+  researched data directly into window.DOCUMENT_DATA and output the HTML immediately.
+- Keep your pre-HTML description to one sentence maximum.
 
 JAVASCRIPT RULES:
 - Prefer CSS-only solutions (hover, :target, details/summary) over JS when possible
@@ -172,7 +174,8 @@ RESPONSE FORMAT:
 
 WEB SEARCH: You have access to web_search. Use it when the user's request requires external
 information (store locations, current prices, facts not in the HTML). Search proactively rather
-than guessing.
+than guessing. After searching, embed all findings directly into the HTML — do NOT narrate
+them before the HTML marker. One sentence max before ---HTML---.
 
 PRESERVATION RULES (these override every other instinct):
 
