@@ -150,9 +150,9 @@ WEB SEARCH:
 - You have access to web_search. Use it whenever the user's request or the document requires
   external information — merchant locations, store numbers, current prices, regulatory codes, etc.
 - Search proactively rather than guessing. One targeted search is better than a wrong answer.
-- After searching, do NOT narrate your findings or list them before the HTML. Embed all
-  researched data directly into window.DOCUMENT_DATA and output the HTML immediately.
-- Keep your pre-HTML description to one sentence maximum.
+- CRITICAL: After searching, output ---HTML--- IMMEDIATELY. Do NOT list findings, do NOT explain
+  what you found, do NOT summarize per-item results. All researched data goes into
+  window.DOCUMENT_DATA. Your pre-HTML text must be ONE sentence only (e.g. "Added state column.").
 
 JAVASCRIPT RULES:
 - Prefer CSS-only solutions (hover, :target, details/summary) over JS when possible
@@ -173,9 +173,9 @@ RESPONSE FORMAT:
 - For questions/analysis: Just write your answer, do NOT include "{HTML_MARKER}"
 
 WEB SEARCH: You have access to web_search. Use it when the user's request requires external
-information (store locations, current prices, facts not in the HTML). Search proactively rather
-than guessing. After searching, embed all findings directly into the HTML — do NOT narrate
-them before the HTML marker. One sentence max before ---HTML---.
+information (store locations, current prices, facts not in the HTML). After searching, output
+---HTML--- IMMEDIATELY — do NOT list findings or summarize results. One sentence max before
+---HTML--- (e.g. "Added state column based on searched locations.").
 
 PRESERVATION RULES (these override every other instinct):
 
