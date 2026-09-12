@@ -149,13 +149,15 @@ DATA-DRIVEN APPROACH (critical — always do this):
 WEB SEARCH:
 - You have access to web_search. Use it whenever the user's request or the document requires
   external information — merchant locations, store numbers, current prices, regulatory codes, etc.
-- Search proactively rather than guessing. One targeted search is better than a wrong answer.
+- Search proactively and thoroughly. Search for EACH unknown merchant individually using its
+  exact name and store number (e.g. "CVS PHARMACY #4455 location" or "Trader Joe's store 534").
+  Do not skip merchants — look up every one you don't already know.
 - For state/location columns: only assign a state for merchants with a physical retail location.
   Leave state blank ("") for online-only services, payments, subscriptions, digital merchants,
   and any merchant where no physical location applies.
-- CRITICAL: After searching, output ---HTML--- IMMEDIATELY. Do NOT list findings, do NOT explain
-  what you found, do NOT summarize per-item results. All researched data goes into
-  window.DOCUMENT_DATA. Your pre-HTML text must be ONE sentence only (e.g. "Added state column.").
+- After ALL searches are done, output your pre-HTML text as ONE sentence only (e.g. "Added state
+  column based on searched locations."), then immediately output ---HTML---. Do NOT list findings
+  or narrate per-merchant results — embed all data directly into window.DOCUMENT_DATA.
 
 JAVASCRIPT RULES:
 - Prefer CSS-only solutions (hover, :target, details/summary) over JS when possible
@@ -176,9 +178,9 @@ RESPONSE FORMAT:
 - For questions/analysis: Just write your answer, do NOT include "{HTML_MARKER}"
 
 WEB SEARCH: You have access to web_search. Use it when the user's request requires external
-information (store locations, current prices, facts not in the HTML). After searching, output
----HTML--- IMMEDIATELY — do NOT list findings or summarize results. One sentence max before
----HTML--- (e.g. "Added state column based on searched locations.").
+information (store locations, current prices, facts not in the HTML). Search for each merchant
+individually using its exact name and store number. After ALL searches complete, output ONE
+sentence then ---HTML--- immediately — do NOT list findings or narrate per-merchant results.
 
 PRESERVATION RULES (these override every other instinct):
 
@@ -389,30 +391,73 @@ Added a bar chart grouping session amounts by month.
             html = html.rsplit("```", 1)[0]
         return {"message": message, "html": html.strip()}
 
+    def _parse_html_response(self, response_text: str) -> Dict | None:
+        """Extract message + html from a response containing HTML_MARKER.
+        Returns None if the marker is absent."""
+        marker_index = response_text.find(HTML_MARKER)
+        if marker_index == -1:
+            return None
+        message = response_text[:marker_index].strip()
+        html = response_text[marker_index + len(HTML_MARKER):].strip()
+        if html.startswith("```"):
+            html = html.split("\n", 1)[-1]
+        if html.endswith("```"):
+            html = html.rsplit("```", 1)[0]
+        return {"message": message, "html": html.strip()}
+
     def _call_and_parse(self, system_prompt: str, messages: list) -> Dict:
-        """Call the API and parse the ---HTML--- delimited response."""
+        """Call the API and parse the ---HTML--- delimited response.
+
+        Two-step flow for requests that require web search:
+          Step 1 — call with web_search enabled; Claude searches and may return research text.
+          Step 2 — if step 1 produced no HTML (token budget used by searches), pass the
+                   research findings back and ask Claude to now generate the visualization.
+        Single-step for plain Q&A or when step 1 already produced HTML.
+        """
         try:
             response_text = self.call_api(system_prompt, messages, tools=[WEB_SEARCH_TOOL])
         except Exception as e:
             return {"message": f"I couldn't process that: {str(e)}", "html": None}
 
-        marker_index = response_text.find(HTML_MARKER)
+        parsed = self._parse_html_response(response_text)
+        if parsed is not None:
+            return parsed
 
-        if marker_index == -1:
-            # Question/analysis response — no HTML
-            return {"message": response_text.strip(), "html": None}
+        # Step 1 returned no HTML — could be:
+        #   (a) a plain Q&A answer (no visualization needed), or
+        #   (b) Claude exhausted its token budget on web searches before generating HTML.
+        # Distinguish by checking whether the response looks like research/findings.
+        _research_signals = (
+            "located", "address", "state", "store", "found", "headquartered",
+            "online", "based in", "physical", "location",
+        )
+        looks_like_research = any(sig in response_text.lower() for sig in _research_signals)
 
-        message = response_text[:marker_index].strip()
-        html = response_text[marker_index + len(HTML_MARKER):].strip()
+        if looks_like_research:
+            # Step 2 — use the gathered research to generate HTML without further searching.
+            followup = messages + [
+                {"role": "assistant", "content": response_text},
+                {
+                    "role": "user",
+                    "content": (
+                        "You have all the information you need. "
+                        "Now output the complete visualization. "
+                        f"Write one sentence, then output {HTML_MARKER} followed by the full HTML."
+                    ),
+                },
+            ]
+            try:
+                response_text2 = self.call_api(system_prompt, followup)
+                parsed2 = self._parse_html_response(response_text2)
+                if parsed2 is not None:
+                    if not parsed2["message"]:
+                        parsed2["message"] = response_text.split("\n")[0].strip()
+                    return parsed2
+            except Exception:
+                pass
 
-        # Strip accidental markdown code fences
-        if html.startswith("```"):
-            html = html.split("\n", 1)[-1]
-        if html.endswith("```"):
-            html = html.rsplit("```", 1)[0]
-        html = html.strip()
-
-        return {"message": message, "html": html}
+        # Plain Q&A answer or both steps failed
+        return {"message": response_text.strip(), "html": None}
 
     _TO_PYTHON_SYSTEM_PROMPT = f"""You are a Python data visualization expert.
 

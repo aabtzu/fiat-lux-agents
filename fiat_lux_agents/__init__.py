@@ -24,6 +24,7 @@ from .web_search_bot import WebSearchBot
 from .url_fetcher import fetch_url, is_safe_url
 from .ml_bot import MLBot
 from .style_writer import StyleWriterBot
+from .statement_parser import StatementParser
 
 try:
     from .data_lake_bot import DataLakeBot, DataLakeChatBot
@@ -67,6 +68,7 @@ __all__ = [
     "is_safe_url",
     "MLBot",
     "StyleWriterBot",
+    "StatementParser",
     "DataLakeBot",
     "DataLakeChatBot",
     "diversify_sample",
