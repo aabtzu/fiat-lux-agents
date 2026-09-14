@@ -22,7 +22,7 @@ _DEFAULT_TAXONOMY = [
     "Travel", "Dining", "Groceries", "Gas & Fuel", "Streaming",
     "Digital Subscriptions", "Fitness", "Shopping", "Home & Garden",
     "Auto", "Utilities", "Healthcare", "Childcare & Education",
-    "Fees & Interest", "Payment", "Other",
+    "Fees & Interest", "Payment", "Income", "Other",
 ]
 
 _PDF_EXTRACT_PROMPT = """Extract all transactions from this bank or credit card statement.
@@ -48,6 +48,7 @@ Rules:
 - "DELTA AIR LINES" → "Travel", "SOULCYCLE" → "Fitness", "NETFLIX" → "Streaming"
 - Be specific: "Streaming" not "Entertainment", "Gas & Fuel" not "Auto", "Dining" not "Food"
 - Payments and balance transfers → "Payment" (e.g. "AUTOPAY PAYMENT", "PAYMENT THANK YOU", "ACH PAYMENT")
+- Payroll, salary, direct deposits, ACH credits that are income/deposits → "Income" (e.g. "DIRECT DEPOSIT", "PAYROLL", "ACH CREDIT", "EMPLOYER DEPOSIT", "ZELLE FROM")
 - Merchant refunds and credits → same category as the merchant (e.g. "AMAZON REFUND" → "Shopping")
 - Use only categories from this list: {cats}
 
