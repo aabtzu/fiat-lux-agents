@@ -41,18 +41,21 @@ Return only a valid JSON array — no prose, no markdown fences."""
 
 def _build_normalize_prompt(taxonomy: list[str]) -> str:
     cats = ", ".join(taxonomy)
-    return f"""Assign a generic spending category to each transaction description.
+    return f"""Assign a generic spending category to each transaction.
+
+Each input item has a "description" and an "amount" (positive = charge/spending, negative = credit/deposit/refund).
 
 Rules:
-- Use the description text to identify what the merchant does — do NOT copy the description as the category
-- "DELTA AIR LINES" → "Travel", "SOULCYCLE" → "Fitness", "NETFLIX" → "Streaming"
-- Be specific: "Streaming" not "Entertainment", "Gas & Fuel" not "Auto", "Dining" not "Food"
-- Payments and balance transfers → "Payment" (e.g. "AUTOPAY PAYMENT", "PAYMENT THANK YOU", "ACH PAYMENT")
-- Payroll, salary, direct deposits, ACH credits that are income/deposits → "Income" (e.g. "DIRECT DEPOSIT", "PAYROLL", "ACH CREDIT", "EMPLOYER DEPOSIT", "ZELLE FROM")
-- Merchant refunds and credits → same category as the merchant (e.g. "AMAZON REFUND" → "Shopping")
+- Use BOTH the description AND amount sign together — never ignore either.
+- Negative amounts are strong evidence of Income, Payment, or a merchant refund.
+- Any description containing "Payroll", "Direct Deposit", "ACH Credit", "Salary", "Employer" → "Income" regardless of company name.
+- Negative amounts with "Payment", "Autopay", "Balance Transfer" in description → "Payment".
+- Negative amounts that are merchant refunds → same category as the merchant (e.g. "AMAZON REFUND" → "Shopping").
+- For positive amounts: identify the merchant type — "DELTA AIR LINES" → "Travel", "SOULCYCLE" → "Fitness", "NETFLIX" → "Streaming".
+- Be specific: "Streaming" not "Entertainment", "Gas & Fuel" not "Auto", "Dining" not "Food".
 - Use only categories from this list: {cats}
 
-Input: a JSON array of merchant/transaction description strings.
+Input: a JSON array of {{"description": str, "amount": number}} objects.
 Return: a JSON array of category strings — same length, same order, nothing else.
 No markdown, no explanation, just the JSON array."""
 
@@ -262,7 +265,7 @@ class StatementParser(LLMBase):
 
         taxonomy = taxonomy or _DEFAULT_TAXONOMY
         prompt = _build_normalize_prompt(taxonomy)
-        descriptions = [r["description"] for r in rows]
+        items = [{"description": r["description"], "amount": r.get("amount", 0)} for r in rows]
 
         t0 = time.time()
         print(f"[StatementParser] Normalizing {len(rows)} rows with {self.category_model}...")
@@ -270,7 +273,7 @@ class StatementParser(LLMBase):
             resp = self.client.messages.create(
                 model=self.category_model,
                 max_tokens=4096,
-                messages=[{"role": "user", "content": f"{prompt}\n\n{json.dumps(descriptions)}"}],
+                messages=[{"role": "user", "content": f"{prompt}\n\n{json.dumps(items)}"}],
             )
             elapsed = time.time() - t0
             raw_text = resp.content[0].text.strip()
