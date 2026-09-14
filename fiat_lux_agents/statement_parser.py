@@ -22,7 +22,7 @@ _DEFAULT_TAXONOMY = [
     "Travel", "Dining", "Groceries", "Gas & Fuel", "Streaming",
     "Digital Subscriptions", "Fitness", "Shopping", "Home & Garden",
     "Auto", "Utilities", "Healthcare", "Childcare & Education",
-    "Fees & Interest", "Payment", "Other",
+    "Fees & Interest", "Payment", "Income", "Other",
 ]
 
 _PDF_EXTRACT_PROMPT = """Extract all transactions from this bank or credit card statement.
@@ -41,17 +41,21 @@ Return only a valid JSON array — no prose, no markdown fences."""
 
 def _build_normalize_prompt(taxonomy: list[str]) -> str:
     cats = ", ".join(taxonomy)
-    return f"""Assign a generic spending category to each transaction description.
+    return f"""Assign a spending category to each transaction.
+
+Each item has a "description" and a "txn_type": "debit" (money out) or "credit" (money in).
 
 Rules:
-- Use the description text to identify what the merchant does — do NOT copy the description as the category
-- "DELTA AIR LINES" → "Travel", "SOULCYCLE" → "Fitness", "NETFLIX" → "Streaming"
-- Be specific: "Streaming" not "Entertainment", "Gas & Fuel" not "Auto", "Dining" not "Food"
-- Payments and balance transfers → "Payment" (e.g. "AUTOPAY PAYMENT", "PAYMENT THANK YOU", "ACH PAYMENT")
-- Merchant refunds and credits → same category as the merchant (e.g. "AMAZON REFUND" → "Shopping")
+- Use BOTH description AND txn_type — never ignore either.
+- txn_type="credit" is strong evidence of Income, Payment, or a merchant refund.
+- txn_type="credit" + description contains "Payroll", "Direct Deposit", "ACH Credit", "Salary", "Employer", "Zelle From" → "Income".
+- txn_type="credit" + description contains "Payment", "Autopay", "Balance Transfer" → "Payment".
+- txn_type="credit" that is a merchant refund → same category as the merchant (e.g. "AMAZON REFUND" → "Shopping").
+- txn_type="debit": identify the merchant type — "DELTA AIR LINES" → "Travel", "SOULCYCLE" → "Fitness", "NETFLIX" → "Streaming".
+- Be specific: "Streaming" not "Entertainment", "Gas & Fuel" not "Auto", "Dining" not "Food".
 - Use only categories from this list: {cats}
 
-Input: a JSON array of merchant/transaction description strings.
+Input: a JSON array of {{"description": str, "txn_type": "debit"|"credit"}} objects.
 Return: a JSON array of category strings — same length, same order, nothing else.
 No markdown, no explanation, just the JSON array."""
 
@@ -101,6 +105,16 @@ def _detect_csv_columns(headers: list[str]) -> dict:
     is_amex = "extended details" in h_lower or "card member" in h_lower
     amount_sign = 1 if is_amex else -1
 
+    # Derive a human-readable source label from the column layout.
+    if is_amex:
+        detected_source = "Amex"
+    elif debit_col and credit_col:
+        # Separate debit/credit columns = BofA style checking
+        detected_source = "BofA Checking"
+    else:
+        # Single signed amount column = Chase style
+        detected_source = "Chase"
+
     return {
         "date_col": date_col,
         "desc_col": desc_col,
@@ -110,6 +124,7 @@ def _detect_csv_columns(headers: list[str]) -> dict:
         "credit_col": credit_col,
         "amount_col": amount_col,
         "amount_sign": amount_sign,
+        "detected_source": detected_source,
     }
 
 
@@ -127,16 +142,18 @@ def _normalize_csv_row(row: dict, cols: dict, source_file: str) -> dict | None:
         debit = _parse_amount(row.get(cols["debit_col"], ""))
         credit = _parse_amount(row.get(cols["credit_col"], ""))
         if debit is not None and debit > 0:
-            amount = debit
+            amount, txn_type = debit, "debit"
         elif credit is not None and credit > 0:
-            amount = -credit
+            amount, txn_type = credit, "credit"
         else:
             return None
     else:
         raw = _parse_amount(row.get(cols["amount_col"], "")) if cols["amount_col"] else None
         if raw is None:
             return None
-        amount = raw * cols["amount_sign"]
+        signed = raw * cols["amount_sign"]
+        txn_type = "debit" if signed > 0 else "credit"
+        amount = abs(signed)
 
     cat = row.get(cols["cat_col"], "").strip() if cols["cat_col"] else ""
     category = cat or "Other"
@@ -150,7 +167,9 @@ def _normalize_csv_row(row: dict, cols: dict, source_file: str) -> dict | None:
         "description": desc,
         "category": category,
         "amount": round(amount, 2),
+        "txn_type": txn_type,
         "account": account,
+        "source": cols.get("detected_source", ""),
         "source_file": source_file,
     }
 
@@ -162,18 +181,20 @@ def _claude_rows_to_transactions(raw: list[dict], source_file: str) -> list[dict
         if not parsed_date:
             continue
         try:
-            amount = float(item.get("amount") or 0)
+            signed = float(item.get("amount") or 0)
         except (ValueError, TypeError):
             continue
         dt = datetime.strptime(parsed_date, "%Y-%m-%d")
         desc = str(item.get("description", "")).strip()
+        txn_type = "credit" if signed < 0 else "debit"
         result.append({
             "txn_date": parsed_date,
             "year": dt.year,
             "month": dt.month,
             "description": desc,
             "category": str(item.get("category") or "Other").strip() or "Other",
-            "amount": round(amount, 2),
+            "amount": round(abs(signed), 2),
+            "txn_type": txn_type,
             "account": str(item.get("account") or ""),
             "source_file": source_file,
         })
@@ -261,7 +282,7 @@ class StatementParser(LLMBase):
 
         taxonomy = taxonomy or _DEFAULT_TAXONOMY
         prompt = _build_normalize_prompt(taxonomy)
-        descriptions = [r["description"] for r in rows]
+        items = [{"description": r["description"], "txn_type": r.get("txn_type", "debit")} for r in rows]
 
         t0 = time.time()
         print(f"[StatementParser] Normalizing {len(rows)} rows with {self.category_model}...")
@@ -269,7 +290,7 @@ class StatementParser(LLMBase):
             resp = self.client.messages.create(
                 model=self.category_model,
                 max_tokens=4096,
-                messages=[{"role": "user", "content": f"{prompt}\n\n{json.dumps(descriptions)}"}],
+                messages=[{"role": "user", "content": f"{prompt}\n\n{json.dumps(items)}"}],
             )
             elapsed = time.time() - t0
             raw_text = resp.content[0].text.strip()
