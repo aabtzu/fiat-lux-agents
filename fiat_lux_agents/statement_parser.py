@@ -30,10 +30,14 @@ Return a JSON array where each element is:
 {
   "date": "YYYY-MM-DD",
   "description": "merchant or payee name",
-  "category": "spending category if shown, else 'Other'",
-  "amount": <positive for charges/spending, negative for payments/refunds/credits>,
-  "account": "last 4 digits of account or account name if visible"
+  "amount": <absolute value, always positive>,
+  "txn_type": "debit" or "credit",
+  "account": "last 4 digits of account or card name if visible"
 }
+
+txn_type rules:
+- "credit" = money flowing INTO the account: payroll, direct deposits, ACH credits, incoming Zelle/wire, refunds, interest, transfers in, credit card payments received
+- "debit"  = money flowing OUT of the account: purchases, charges, withdrawals, outgoing Zelle/wire, loan payments, bill pay, credit card charges
 
 Include all transactions. Skip running balances, summary rows, totals, and non-transaction lines.
 Return only a valid JSON array — no prose, no markdown fences."""
@@ -181,19 +185,31 @@ def _claude_rows_to_transactions(raw: list[dict], source_file: str) -> list[dict
         if not parsed_date:
             continue
         try:
-            signed = float(item.get("amount") or 0)
+            amount = abs(float(item.get("amount") or 0))
         except (ValueError, TypeError):
+            continue
+        if amount == 0:
             continue
         dt = datetime.strptime(parsed_date, "%Y-%m-%d")
         desc = str(item.get("description", "")).strip()
-        txn_type = "credit" if signed < 0 else "debit"
+        # Use txn_type if Claude returned it; fall back to sign convention for old prompts.
+        raw_type = str(item.get("txn_type") or "").strip().lower()
+        if raw_type in ("credit", "debit"):
+            txn_type = raw_type
+        else:
+            # Legacy fallback: negative signed amount = credit.
+            try:
+                signed = float(item.get("amount") or 0)
+            except (ValueError, TypeError):
+                signed = amount
+            txn_type = "credit" if signed < 0 else "debit"
         result.append({
             "txn_date": parsed_date,
             "year": dt.year,
             "month": dt.month,
             "description": desc,
             "category": str(item.get("category") or "Other").strip() or "Other",
-            "amount": round(abs(signed), 2),
+            "amount": round(amount, 2),
             "txn_type": txn_type,
             "account": str(item.get("account") or ""),
             "source_file": source_file,
