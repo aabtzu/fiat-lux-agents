@@ -46,6 +46,24 @@ Include all transactions. Skip running balances, summary rows, totals, and non-t
 Return only a valid JSON array — no prose, no markdown fences."""
 
 
+def _extract_cat_conf(item) -> tuple[str, float]:
+    """Extract (category, confidence) from a Haiku response item.
+
+    Handles both new dict format {"category": str, "confidence": float}
+    and legacy str format for backward compatibility.
+    """
+    if isinstance(item, dict):
+        cat = str(item.get("category", "")).strip()
+        try:
+            conf = float(item.get("confidence", 1.0))
+        except (ValueError, TypeError):
+            conf = 1.0
+        return cat, max(0.0, min(1.0, conf))
+    if isinstance(item, str) and item.strip():
+        return item.strip(), 1.0
+    return "", 1.0
+
+
 def _build_normalize_prompt(taxonomy: list[str]) -> str:
     cats = ", ".join(taxonomy)
     return f"""Assign a spending category to each transaction description.
@@ -131,10 +149,18 @@ Credit card payments, loan payments, Amex autopay, Chase autopay. Outgoing Venmo
 ## Final rules
 - Use only categories from this list: {cats}
 - "Other" is a last resort — try hard to match a specific category first
-- Return EXACTLY one category string per input item, same count and same order
+- Return EXACTLY one object per input item, same count and same order
+
+## Confidence scoring
+Assign a confidence score (0.0–1.0) reflecting how certain you are of the category:
+- 0.9–1.0: Clear match — well-known merchant, explicit pattern (TST*, APPLE.COM/BILL, airline name)
+- 0.7–0.89: Reasonable guess — familiar merchant type, partial pattern match
+- 0.5–0.69: Ambiguous — unfamiliar merchant name, could fit multiple categories
+- 0.3–0.49: Very uncertain — generic or cryptic description, no recognizable pattern
+Use confidence < 0.7 when: merchant name is a single word or abbreviation with no context, the name sounds like one thing but could be another (e.g. "Garagiste" sounds like auto but is wine), or the transaction is from a foreign city with unfamiliar merchants.
 
 Input: a JSON array of {{"description": str, "txn_type": "debit"|"credit"}} objects.
-Return: a JSON array of category strings — same length, same order, nothing else.
+Return: a JSON array of {{"category": str, "confidence": float}} objects — same length, same order, nothing else.
 No markdown, no explanation, just the JSON array."""
 
 
@@ -433,9 +459,11 @@ class StatementParser(LLMBase):
             normalized = json.loads(raw_text)
             if isinstance(normalized, list) and len(normalized) > 0:
                 applied = 0
-                for row, cat in zip(rows, normalized):
-                    if isinstance(cat, str) and cat.strip():
-                        row["category"] = cat.strip()
+                for row, item in zip(rows, normalized):
+                    cat, conf = _extract_cat_conf(item)
+                    if cat:
+                        row["category"] = cat
+                        row["confidence"] = conf
                         applied += 1
                 print(f"[StatementParser] Categories applied to {applied}/{len(rows)} rows.")
                 if len(normalized) < len(rows):
@@ -452,9 +480,11 @@ class StatementParser(LLMBase):
                         retry_text = re.sub(r"```[^\n]*\n?", "", retry_text).strip()
                     retry_cats = json.loads(retry_text)
                     if isinstance(retry_cats, list):
-                        for row, cat in zip(missed, retry_cats):
-                            if isinstance(cat, str) and cat.strip():
-                                row["category"] = cat.strip()
+                        for row, item in zip(missed, retry_cats):
+                            cat, conf = _extract_cat_conf(item)
+                            if cat:
+                                row["category"] = cat
+                                row["confidence"] = conf
                         print(f"[StatementParser] Retry categorized {min(len(retry_cats), len(missed))} missed rows.")
                 elif len(normalized) > len(rows):
                     print(f"[StatementParser] Got {len(normalized)} categories for {len(rows)} rows — used first {len(rows)}")
