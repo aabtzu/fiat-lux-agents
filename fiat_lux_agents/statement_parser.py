@@ -62,12 +62,17 @@ Bank statement descriptions often append the merchant's physical location as a s
 A city/state suffix is the store's address — it does NOT mean the transaction is Travel.
 Identify the merchant name BEFORE the last " - CITY STATE" portion.
 
-Also ignore payment method prefixes: "AplPay" (Apple Pay), "GglPay" (Google Pay), "SQ *" (Square), "GOOGLE*" — these are just how the charge was processed.
+Also ignore payment method and POS system prefixes when identifying the merchant:
+- "AplPay" = Apple Pay, "GglPay" = Google Pay, "GOOGLE*" = Google billing
+- "SQ *" or "SP " = Square point-of-sale terminal (look at the merchant name after the prefix)
+- "TST*" = Toast point-of-sale terminal used exclusively by restaurants → always Dining
+- "GF*" = GoFundMe or similar service
 
 ## Category rules (debit = money out)
 
 ### Travel
-Only use Travel for: airlines (Delta, United, American, Southwest, JetBlue, Amtrak), hotels (Marriott, Hilton, Hyatt, IHG), car rentals (Hertz, Avis, Enterprise, Budget, Kesher), airport parking, Airbnb, Expedia, booking.com, CLEAR (airport security), travel insurance premiums (Baggage Insurance, Travel Delay Insurance), Uber/Lyft ride-shares, taxi services.
+Only use Travel for: airlines (Delta, United, American, Southwest, JetBlue, Amtrak), hotels (Marriott, Hilton, Hyatt, IHG, Crowne Plaza, Bereshit Hotel, hotel chains), car rentals (Hertz, Avis, Enterprise, Budget, Kesher), airport parking, Airbnb (pattern: "AIRBNB *"), Expedia, booking.com, CLEAR (airport security), travel insurance premiums (Baggage Insurance, Travel Delay Insurance), Uber/Lyft ride-shares, taxi services, tours and tour operators.
+Do NOT use Travel for restaurants, cafes, bakeries, or any food establishment — even if they are in a travel destination city.
 
 ### Streaming
 Netflix, Hulu, HBO Max, Disney Plus, Disney+, Peacock, Apple TV+, YouTube, YouTube TV, YouTube Premium, YouTube Music, Spotify, Pandora, Tidal, Apple Music, Sling, Paramount+, Discovery+, ESPN+, Fubo.
@@ -433,8 +438,26 @@ class StatementParser(LLMBase):
                         row["category"] = cat.strip()
                         applied += 1
                 print(f"[StatementParser] Categories applied to {applied}/{len(rows)} rows.")
-                if len(normalized) != len(rows):
-                    print(f"[StatementParser] Note: got {len(normalized)} categories for {len(rows)} rows — used first {min(len(normalized), len(rows))}")
+                if len(normalized) < len(rows):
+                    missed = rows[len(normalized):]
+                    print(f"[StatementParser] {len(missed)} rows uncategorized — retrying")
+                    retry_items = [{"description": r["description"], "txn_type": r.get("txn_type", "debit")} for r in missed]
+                    retry_resp = self.client.messages.create(
+                        model=self.category_model,
+                        max_tokens=4096,
+                        messages=[{"role": "user", "content": f"{prompt}\n\n{json.dumps(retry_items)}"}],
+                    )
+                    retry_text = retry_resp.content[0].text.strip()
+                    if retry_text.startswith("```"):
+                        retry_text = re.sub(r"```[^\n]*\n?", "", retry_text).strip()
+                    retry_cats = json.loads(retry_text)
+                    if isinstance(retry_cats, list):
+                        for row, cat in zip(missed, retry_cats):
+                            if isinstance(cat, str) and cat.strip():
+                                row["category"] = cat.strip()
+                        print(f"[StatementParser] Retry categorized {min(len(retry_cats), len(missed))} missed rows.")
+                elif len(normalized) > len(rows):
+                    print(f"[StatementParser] Got {len(normalized)} categories for {len(rows)} rows — used first {len(rows)}")
             else:
                 print(f"[StatementParser] Unexpected response type: {type(normalized)}")
         except Exception as exc:
