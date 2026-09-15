@@ -48,19 +48,47 @@ Return only a valid JSON array — no prose, no markdown fences."""
 
 def _build_normalize_prompt(taxonomy: list[str]) -> str:
     cats = ", ".join(taxonomy)
-    return f"""Assign a spending category to each transaction.
+    return f"""Assign a spending category to each transaction description.
 
-Each item has a "description" and a "txn_type": "debit" (money out) or "credit" (money in).
+Each item has a "description" (from a bank statement) and a "txn_type": "debit" (money out) or "credit" (money in).
 
-Rules:
-- Use BOTH description AND txn_type — never ignore either.
-- txn_type="credit" is strong evidence of Income, Payment, or a merchant refund.
-- txn_type="credit" + description contains "Payroll", "Direct Deposit", "ACH Credit", "Salary", "Employer", "Zelle From" → "Income".
-- txn_type="credit" + description contains "Payment", "Autopay", "Balance Transfer" → "Payment".
-- txn_type="credit" that is a merchant refund → same category as the merchant (e.g. "AMAZON REFUND" → "Shopping").
-- txn_type="debit": identify the merchant type — "DELTA AIR LINES" → "Travel", "SOULCYCLE" → "Fitness", "NETFLIX" → "Streaming".
-- Be specific: "Streaming" not "Entertainment", "Gas & Fuel" not "Auto", "Dining" not "Food".
-- Use only categories from this list: {cats}
+## CRITICAL: Bank description format
+Bank statement descriptions often append the merchant's physical location as a suffix, e.g.:
+  "JACKS AUTOMOTIVE LARCHMONT INC - LARCHMONT NY"
+  "BARNES & NOBLE #3304 - SCARSDALE NY"
+  "NEW YORK STATE DMV - ALBANY NY"
+
+A city/state suffix is the store's address — it does NOT mean the transaction is Travel.
+Ignore trailing "- CITY STATE" suffixes when identifying the merchant.
+
+Also ignore payment method prefixes: "AplPay" (Apple Pay), "GglPay" (Google Pay), "SQ *" (Square) — these are just how the charge was processed.
+
+## Category rules
+
+Credits (money IN):
+- "Payroll", "Direct Deposit", "ACH Credit", "Salary", "Zelle From" → Income
+- "Payment", "Autopay", "Balance Transfer", "AMEX EPAYMENT" → Payment
+- Merchant refund/credit → same category as the merchant
+
+Debits (money OUT) — identify the merchant, ignore location suffix:
+- Airlines, hotels, Airbnb, Marriott, Hilton, booking.com, Expedia → Travel
+- Uber, Lyft (rides only — not Uber Eats) → Travel
+- Restaurants, cafes, DoorDash, Grubhub, Uber Eats → Dining
+- Grocery stores (Whole Foods, Trader Joe's, Stop & Shop, Fairway) → Groceries
+- Gas stations (Shell, Mobil, BP, Sunoco, Exxon) → Gas & Fuel
+- E-ZPass, tolls → Gas & Fuel
+- Auto repair shops, car dealers, DMV, automotive services → Auto
+- Netflix, Hulu, HBO, Disney+, Peacock, YouTube Premium, Spotify, Apple TV → Streaming
+- Other software subscriptions, SaaS → Digital Subscriptions
+- Gym, fitness studios (SoulCycle, Equinox, Planet Fitness) → Fitness
+- Retail shopping (Amazon, Target, Walmart, Barnes & Noble, department stores, sporting goods) → Shopping
+- Home improvement (Home Depot, Lowe's, IKEA) → Home & Garden
+- Pharmacies, doctors, hospitals, dental, vision → Healthcare
+- School tuition, daycare, tutoring → Childcare & Education
+- Bank fees, interest charges, late fees → Fees & Interest
+- Utilities (electric, gas, water, internet, phone) → Utilities
+
+Be specific. Use only categories from this list: {cats}
 
 Input: a JSON array of {{"description": str, "txn_type": "debit"|"credit"}} objects.
 Return: a JSON array of category strings — same length, same order, nothing else.
