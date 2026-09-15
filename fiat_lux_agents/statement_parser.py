@@ -32,12 +32,15 @@ Return a JSON array where each element is:
   "description": "merchant or payee name",
   "amount": <absolute value, always positive>,
   "txn_type": "debit" or "credit",
-  "account": "last 4 digits of account or card name if visible"
+  "source": "institution and account type, e.g. Chase Checking, Chase Savings, Amex, BofA Checking, Citi Card",
+  "account": "last 4 digits of account or card if visible, else empty string"
 }
 
 txn_type rules:
 - "credit" = money flowing INTO the account: payroll, direct deposits, ACH credits, incoming Zelle/wire, refunds, interest, transfers in, credit card payments received
 - "debit"  = money flowing OUT of the account: purchases, charges, withdrawals, outgoing Zelle/wire, loan payments, bill pay, credit card charges
+
+source: read the institution name and account type from the statement header (e.g. "Chase Premier Plus Checking" → "Chase Checking", "American Express" → "Amex", "Bank of America Checking" → "BofA Checking"). Use the same source value for every row in the file.
 
 Include all transactions. Skip running balances, summary rows, totals, and non-transaction lines.
 Return only a valid JSON array — no prose, no markdown fences."""
@@ -211,6 +214,7 @@ def _claude_rows_to_transactions(raw: list[dict], source_file: str) -> list[dict
             "category": str(item.get("category") or "Other").strip() or "Other",
             "amount": round(amount, 2),
             "txn_type": txn_type,
+            "source": str(item.get("source") or "").strip(),
             "account": str(item.get("account") or ""),
             "source_file": source_file,
         })
