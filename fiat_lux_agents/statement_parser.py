@@ -57,38 +57,76 @@ Bank statement descriptions often append the merchant's physical location as a s
   "JACKS AUTOMOTIVE LARCHMONT INC - LARCHMONT NY"
   "BARNES & NOBLE #3304 - SCARSDALE NY"
   "NEW YORK STATE DMV - ALBANY NY"
+  "LENSCRAFTERS - SCARSDALE NY"
 
 A city/state suffix is the store's address — it does NOT mean the transaction is Travel.
-Ignore trailing "- CITY STATE" suffixes when identifying the merchant.
+Identify the merchant name BEFORE the last " - CITY STATE" portion.
 
-Also ignore payment method prefixes: "AplPay" (Apple Pay), "GglPay" (Google Pay), "SQ *" (Square) — these are just how the charge was processed.
+Also ignore payment method prefixes: "AplPay" (Apple Pay), "GglPay" (Google Pay), "SQ *" (Square), "GOOGLE*" — these are just how the charge was processed.
 
-## Category rules
+## Category rules (debit = money out)
 
-Credits (money IN):
-- "Payroll", "Direct Deposit", "ACH Credit", "Salary", "Zelle From" → Income
-- "Payment", "Autopay", "Balance Transfer", "AMEX EPAYMENT" → Payment
-- Merchant refund/credit → same category as the merchant
+### Travel
+Only use Travel for: airlines (Delta, United, American, Southwest, JetBlue, Amtrak), hotels (Marriott, Hilton, Hyatt, IHG), car rentals (Hertz, Avis, Enterprise, Budget, Kesher), airport parking, Airbnb, Expedia, booking.com, CLEAR (airport security), travel insurance premiums (Baggage Insurance, Travel Delay Insurance), Uber/Lyft ride-shares, taxi services.
 
-Debits (money OUT) — identify the merchant, ignore location suffix:
-- Airlines, hotels, Airbnb, Marriott, Hilton, booking.com, Expedia → Travel
-- Uber, Lyft (rides only — not Uber Eats) → Travel
-- Restaurants, cafes, DoorDash, Grubhub, Uber Eats → Dining
-- Grocery stores (Whole Foods, Trader Joe's, Stop & Shop, Fairway) → Groceries
-- Gas stations (Shell, Mobil, BP, Sunoco, Exxon) → Gas & Fuel
-- E-ZPass, tolls → Gas & Fuel
-- Auto repair shops, car dealers, DMV, automotive services → Auto
-- Netflix, Hulu, HBO, Disney+, Peacock, YouTube Premium, Spotify, Apple TV → Streaming
-- Other software subscriptions, SaaS → Digital Subscriptions
-- Gym, fitness studios (SoulCycle, Equinox, Planet Fitness) → Fitness
-- Retail shopping (Amazon, Target, Walmart, Barnes & Noble, department stores, sporting goods) → Shopping
-- Home improvement (Home Depot, Lowe's, IKEA) → Home & Garden
-- Pharmacies, doctors, hospitals, dental, vision → Healthcare
-- School tuition, daycare, tutoring → Childcare & Education
-- Bank fees, interest charges, late fees → Fees & Interest
-- Utilities (electric, gas, water, internet, phone) → Utilities
+### Streaming
+Netflix, Hulu, HBO Max, Disney Plus, Disney+, Peacock, Apple TV+, YouTube, YouTube TV, YouTube Premium, YouTube Music, Spotify, Pandora, Tidal, Apple Music, Sling, Paramount+, Discovery+, ESPN+, Fubo.
+"GOOGLE*YOUTUBE", "GOOGLE*YT PRIMETIME", "GOOGLE*YOUTUBETV" → Streaming
+"PEACOCK" → Streaming
+"DISNEY PLUS" or "DISNEY+" → Streaming
 
-Be specific. Use only categories from this list: {cats}
+### Digital Subscriptions
+Software, SaaS, developer tools, productivity apps: Adobe, Microsoft 365, Dropbox, iCloud (APPLE.COM/BILL), GitHub, LinkedIn Premium, Anthropic, Cursor, OpenAI, Notion, Slack, DakBoard, Concur, Splitwise, Medium.
+"APPLE.COM/BILL" → Digital Subscriptions (Apple's subscription billing)
+NOT Streaming services (those go above).
+
+### Fitness
+Gyms and fitness studios: SoulCycle, Equinox, Planet Fitness, CrossFit, Peloton, Snap Fitness, LA Fitness, 24 Hour Fitness, YMCA.
+Sports equipment stores (Pure Hockey, REI, Dick's Sporting Goods) → Shopping, NOT Fitness.
+
+### Shopping
+Retail: Amazon, Target, Walmart, Barnes & Noble, sporting goods stores, sports equipment shops (Pure Hockey, Hockey Town), department stores, clothing, electronics.
+
+### Groceries
+Grocery stores: Whole Foods, Trader Joe's, Stop & Shop, Fairway, Costco, BJ's, Wegmans, ShopRite, Key Food.
+
+### Gas & Fuel
+Gas stations AND convenience stores with gas: Shell, Mobil, BP, Sunoco, Exxon, Chevron, Gulf, Cumberland Farms, Wawa, Sheetz, Speedway.
+E-ZPass, tolls, EZPass → Gas & Fuel.
+
+### Auto
+Auto repair shops, mechanics, car washes, automotive parts: Jiffy Lube, Midas, AutoZone, O'Reilly, Garagiste.
+Car loan payments → Auto.
+DMV fees, vehicle registration → Fees & Interest (government fee, NOT Auto).
+
+### Healthcare
+Doctors, dentists, hospitals, pharmacies, opticians: CVS Pharmacy, Walgreens, LensCrafters (optical/eyewear), vision centers, dental offices.
+"LENSCRAFTERS" → Healthcare (it's an eyewear/vision store).
+
+### Utilities
+Electric, gas, water, internet, phone service: Con Edison, Con Ed, National Grid, Verizon (phone bill), AT&T, T-Mobile, Google Fi, water utilities, Vermont Gas.
+NOT APPLE.COM/BILL (that is Digital Subscriptions).
+
+### Home & Garden
+Home improvement, hardware, locksmiths, furniture, appliances: Home Depot, Lowe's, IKEA, hardware stores, locksmith services (ABCO Lock).
+
+### Fees & Interest
+Bank fees, interest charges, ATM fees, government fees, vehicle registration, DMV fees, insurance premiums NOT related to travel, late fees.
+
+### Dining
+Restaurants, cafes, fast food, food delivery: DoorDash, Grubhub, Uber Eats, Seamless, and any restaurant.
+
+### Income (credits only)
+Payroll, direct deposits, ACH credits, salary, employer payments, rental income, freelance payments, interest earned.
+"Zelle From" → Income. "Fidelity" transfer in → Income.
+
+### Payment (credits only, or outgoing bill payments)
+Credit card payments, loan payments, Amex autopay, Chase autopay. Outgoing Venmo/Zelle → Payment.
+
+## Final rules
+- Use only categories from this list: {cats}
+- "Other" is a last resort — try hard to match a specific category first
+- Return EXACTLY one category string per input item, same count and same order
 
 Input: a JSON array of {{"description": str, "txn_type": "debit"|"credit"}} objects.
 Return: a JSON array of category strings — same length, same order, nothing else.
@@ -209,6 +247,41 @@ def _normalize_csv_row(row: dict, cols: dict, source_file: str) -> dict | None:
     }
 
 
+def _recover_partial_json_array(text: str) -> list:
+    """Extract complete objects from a truncated JSON array (stop_reason=max_tokens)."""
+    start = text.find("[")
+    if start == -1:
+        return []
+    depth = 0
+    in_string = False
+    escape_next = False
+    last_complete = -1
+    for i, ch in enumerate(text[start:], start):
+        if escape_next:
+            escape_next = False
+            continue
+        if ch == "\\" and in_string:
+            escape_next = True
+            continue
+        if ch == '"':
+            in_string = not in_string
+            continue
+        if in_string:
+            continue
+        if ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                last_complete = i
+    if last_complete == -1:
+        return []
+    try:
+        return json.loads(text[start : last_complete + 1] + "]")
+    except json.JSONDecodeError:
+        return []
+
+
 def _claude_rows_to_transactions(raw: list[dict], source_file: str) -> list[dict]:
     result = []
     for item in raw:
@@ -299,6 +372,11 @@ class StatementParser(LLMBase):
                 ]}],
             )
             raw_text = resp.content[0].text
+            if resp.stop_reason == "max_tokens":
+                print(f"[StatementParser] WARNING: PDF response truncated ({len(raw_text)} chars) — recovering partial results")
+                raw = _recover_partial_json_array(raw_text)
+                print(f"[StatementParser] Recovered {len(raw)} complete objects from truncated response")
+                return _claude_rows_to_transactions(raw, filename)
             m = re.search(r"\[[\s\S]*\]", raw_text.strip())
             if not m:
                 return []
