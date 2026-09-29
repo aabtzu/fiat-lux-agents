@@ -10,18 +10,25 @@ MIN_PASSWORD_LEN = 6
 
 def register(
     db: AuthDB,
-    username: str,
     email: str,
     password: str,
+    username: str = "",
+    display_name: str = "",
     invite_code: str = "",
     required_invite_code: str = "",
 ) -> tuple[bool, str | None]:
-    """Validate and create a new user. Returns (success, error_message)."""
-    username = username.strip()
-    email = email.strip()
-    password = password.strip()
+    """Validate and create a new user. Returns (success, error_message).
 
-    if len(username) < MIN_USERNAME_LEN:
+    When db.login_field == "username", username is required and validated.
+    When db.login_field == "email", username is ignored.
+    display_name is stored when db.has_display_name is True.
+    """
+    username = username.strip()
+    email = email.strip().lower()
+    password = password.strip()
+    display_name = display_name.strip()
+
+    if db.login_field == "username" and len(username) < MIN_USERNAME_LEN:
         return False, f"Username must be at least {MIN_USERNAME_LEN} characters"
     if not email or "@" not in email:
         return False, "Invalid email address"
@@ -34,28 +41,37 @@ def register(
         if invite_code != required_invite_code:
             return False, "Invalid invite code"
 
-    if db.username_exists(username):
+    if db.login_field == "username" and db.username_exists(username):
         return False, "Username already taken"
     if db.email_exists(email):
         return False, "Email already registered"
 
-    user_id = db.create_user(username, email, password)
+    user_id = db.create_user(
+        email=email,
+        password=password,
+        username=username,
+        display_name=display_name or (email.split("@")[0] if db.has_display_name else ""),
+    )
     if user_id:
         return True, None
     return False, "Failed to create user"
 
 
 def login(
-    db: AuthDB, username: str, password: str
+    db: AuthDB, credential: str, password: str
 ) -> tuple[dict | None, str | None]:
-    """Authenticate. Returns (user_dict, None) or (None, error_message)."""
-    username = username.strip()
+    """Authenticate. credential is email or username depending on db.login_field.
+
+    Returns (user_dict, None) or (None, error_message).
+    """
+    credential = credential.strip()
     password = password.strip()
-    if not username or not password:
-        return None, "Username and password required"
-    user = db.authenticate(username, password)
+    if not credential or not password:
+        field = db.login_field
+        return None, f"{field.capitalize()} and password required"
+    user = db.authenticate(credential, password)
     if not user:
-        return None, "Invalid username or password"
+        return None, f"Invalid {db.login_field} or password"
     return user, None
 
 
@@ -79,8 +95,9 @@ def forgot_password(
     token = generate_reset_token(user["id"], secret_key)
     reset_url = f"{app_url.rstrip('/')}/reset-password.html?token={token}"
 
+    display = user.get("display_name") or user.get("username") or email
     body = f"""
-<p>Hi {user['username']},</p>
+<p>Hi {display},</p>
 <p>Someone requested a password reset for your {app_name} account.</p>
 <p><a href="{reset_url}" style="background:#667eea;color:white;padding:12px 24px;
 border-radius:8px;text-decoration:none;font-weight:600;">Reset Password</a></p>
