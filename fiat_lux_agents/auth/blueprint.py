@@ -1,9 +1,6 @@
 """Flask blueprint factory for fla-auth.
 
-Usage in app.py:
-    from fiat_lux_agents.auth import make_auth_blueprint
-    from database.connection import get_db, USE_POSTGRES
-
+Username-based usage (libertas / default):
     auth_bp = make_auth_blueprint(
         get_connection=get_db,
         use_postgres=USE_POSTGRES,
@@ -12,7 +9,17 @@ Usage in app.py:
         app_url="https://libertas-travel.onrender.com",
         from_email="noreply@libertas-travel.onrender.com",
     )
-    app.register_blueprint(auth_bp)
+
+Email-based usage (fiat-lux style):
+    auth_bp = make_auth_blueprint(
+        get_connection=db,
+        login_field="email",
+        has_display_name=True,
+        secret_key=os.environ["SECRET_KEY"],
+        app_url="https://fiat-lux.onrender.com",
+        from_email="noreply@fiat-lux.onrender.com",
+        app_name="Fiat Lux",
+    )
 """
 
 from __future__ import annotations
@@ -29,6 +36,8 @@ from . import handlers
 def make_auth_blueprint(
     get_connection: Callable,
     use_postgres: bool = False,
+    login_field: str = "username",
+    has_display_name: bool = False,
     invite_code: str = "",
     secret_key: str = "",
     app_url: str = "",
@@ -40,17 +49,19 @@ def make_auth_blueprint(
     """Return a configured auth blueprint.
 
     Args:
-        get_connection: callable returning a context manager for a DB connection
-        use_postgres:   True if the DB uses %s placeholders (Postgres), False for ? (SQLite)
-        invite_code:    if set, required on registration
-        secret_key:     HMAC key for reset tokens (use app SECRET_KEY)
-        app_url:        base URL for reset links, e.g. https://libertas-travel.onrender.com
-        from_email:     sender address for reset emails
-        app_name:       app name shown in emails
-        url_prefix:     prefix for all routes (default /api)
-        blueprint_name: Flask blueprint name (change if registering multiple times)
+        get_connection:  callable returning a context manager for a DB connection
+        use_postgres:    True if the DB uses %s placeholders (Postgres), False for ? (SQLite)
+        login_field:     "username" (default) or "email" — which field is used to log in
+        has_display_name: True if the users table has a display_name column
+        invite_code:     if set, required on registration
+        secret_key:      HMAC key for reset tokens (use app SECRET_KEY)
+        app_url:         base URL for reset links
+        from_email:      sender address for reset emails
+        app_name:        app name shown in emails
+        url_prefix:      prefix for all routes (default /api)
+        blueprint_name:  Flask blueprint name (change if registering multiple times)
     """
-    db = AuthDB(get_connection, use_postgres)
+    db = AuthDB(get_connection, use_postgres, login_field=login_field, has_display_name=has_display_name)
     bp = Blueprint(blueprint_name, __name__, template_folder="templates")
 
     def _ok(data: dict) -> tuple:
@@ -62,17 +73,20 @@ def make_auth_blueprint(
     @bp.post(f"{url_prefix}/login")
     def login():
         data = request.get_json(silent=True) or {}
-        user, error = handlers.login(
-            db,
-            data.get("username", ""),
-            data.get("password", ""),
-        )
+        credential = data.get(login_field, "")
+        user, error = handlers.login(db, credential, data.get("password", ""))
         if error:
             return _err(error, 401 if "Invalid" in error else 400)
         session.permanent = True
         session["user_id"] = user["id"]
-        session["username"] = user["username"]
-        return _ok({"username": user["username"]})
+        if login_field == "email":
+            session["email"] = user.get("email", "")
+            if has_display_name:
+                session["display_name"] = user.get("display_name", "")
+            return _ok({"email": user.get("email", ""), "display_name": user.get("display_name", "")})
+        else:
+            session["username"] = user["username"]
+            return _ok({"username": user["username"]})
 
     @bp.post(f"{url_prefix}/register")
     def register():
@@ -82,12 +96,14 @@ def make_auth_blueprint(
             username=data.get("username", ""),
             email=data.get("email", ""),
             password=data.get("password", ""),
+            display_name=data.get("display_name", ""),
             invite_code=data.get("invite_code", ""),
             required_invite_code=invite_code,
         )
         if success:
             ts = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
-            print(f"[fla-auth][SIGNUP] {data.get('username', '').strip()} @ {ts}", flush=True)
+            identifier = data.get(login_field, "").strip()
+            print(f"[fla-auth][SIGNUP] {identifier} @ {ts}", flush=True)
             return _ok({})
         return _err(error)
 
