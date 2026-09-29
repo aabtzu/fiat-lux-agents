@@ -129,6 +129,10 @@ HTML RULES:
 9. For healthcare: consider summary cards, cost breakdowns, or timeline views
 10. Always include a title/header in the visualization
 11. Use relative units (rem, %, etc.) so it scales well
+12. For multi-column comparison tables (2+ columns): wrap the <table> in
+    <div style="overflow-x:auto;-webkit-overflow-scrolling:touch"> and set
+    a min-width on the table (e.g. min-width:600px) so it scrolls horizontally
+    on narrow screens instead of collapsing into unreadable wrapped cells
 
 DATA-DRIVEN APPROACH (critical — always do this):
 - ALWAYS store the raw records as `window.DOCUMENT_DATA` at the very top of your <script> tag.
