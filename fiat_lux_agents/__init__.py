@@ -22,6 +22,7 @@ from .knowledge_bot import KnowledgeBot
 from .document_bot import DocumentBot
 from .web_search_bot import WebSearchBot
 from .url_fetcher import fetch_url, is_safe_url
+from .file_utils import extract_text
 from .ml_bot import MLBot
 from .style_writer import StyleWriterBot
 from .statement_parser import StatementParser
@@ -67,6 +68,7 @@ __all__ = [
     "WebSearchBot",
     "fetch_url",
     "is_safe_url",
+    "extract_text",
     "MLBot",
     "StyleWriterBot",
     "StatementParser",
