@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import contextlib
+import os
 import sqlite3
 
 import pytest
@@ -14,10 +15,10 @@ from fiat_lux_agents.auth import handlers
 
 
 # ---------------------------------------------------------------------------
-# In-memory SQLite fixture
+# SQLite fixture
 # ---------------------------------------------------------------------------
 
-_CREATE_USERS = """
+_CREATE_USERS_SQ = """
 CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     username TEXT UNIQUE NOT NULL,
@@ -31,7 +32,7 @@ CREATE TABLE IF NOT EXISTS users (
 def mem_db_factory():
     conn = sqlite3.connect(":memory:")
     conn.row_factory = sqlite3.Row
-    conn.execute(_CREATE_USERS)
+    conn.execute(_CREATE_USERS_SQ)
     conn.commit()
 
     @contextlib.contextmanager
@@ -42,9 +43,68 @@ def mem_db_factory():
     conn.close()
 
 
+# ---------------------------------------------------------------------------
+# PostgreSQL fixture (skipped when DATABASE_URL is not set)
+# ---------------------------------------------------------------------------
+
+_CREATE_USERS_PG = """
+CREATE TABLE IF NOT EXISTS users (
+    id SERIAL PRIMARY KEY,
+    username TEXT UNIQUE NOT NULL,
+    email TEXT UNIQUE NOT NULL,
+    password_hash TEXT NOT NULL
+)
+"""
+
+
 @pytest.fixture
-def auth_db(mem_db_factory):
-    return AuthDB(mem_db_factory, use_postgres=False)
+def pg_db_factory():
+    """Connect to a real PostgreSQL DB. Requires DATABASE_URL env var.
+
+    In CI this is provided by the postgres service container.
+    Locally, skip if the env var is absent so developers can run tests
+    without Docker.
+    """
+    db_url = os.environ.get("DATABASE_URL")
+    if not db_url:
+        pytest.skip("DATABASE_URL not set - skipping PostgreSQL tests")
+
+    try:
+        import psycopg2
+    except ImportError:
+        pytest.skip("psycopg2 not installed - skipping PostgreSQL tests")
+
+    conn = psycopg2.connect(db_url)
+    conn.autocommit = False
+    with conn.cursor() as cur:
+        cur.execute(_CREATE_USERS_PG)
+    conn.commit()
+
+    @contextlib.contextmanager
+    def get_connection():
+        yield conn
+        conn.rollback()  # roll back each test so state doesn't bleed
+
+    yield get_connection
+
+    # Drop the table so a re-run starts clean
+    with conn.cursor() as cur:
+        cur.execute("DROP TABLE IF EXISTS users")
+    conn.commit()
+    conn.close()
+
+
+# ---------------------------------------------------------------------------
+# Parametrized auth_db: runs every TestAuthDB test against both backends
+# ---------------------------------------------------------------------------
+
+@pytest.fixture(params=["sqlite", "postgres"])
+def auth_db(request):
+    if request.param == "sqlite":
+        factory = request.getfixturevalue("mem_db_factory")
+        return AuthDB(factory, use_postgres=False)
+    factory = request.getfixturevalue("pg_db_factory")
+    return AuthDB(factory, use_postgres=True)
 
 
 _SECRET = "test-secret"
