@@ -90,15 +90,9 @@ def verify_password(password: str, password_hash: str) -> bool:
     return bcrypt.checkpw(password.encode(), password_hash.encode())
 
 
-def _row_to_user(row, use_postgres: bool) -> dict[str, Any]:
-    if use_postgres:
-        return dict(zip([d[0] for d in row.description], row)) if hasattr(row, 'description') else {
-            "id": row[0],
-            "username": row[1],
-            "email": row[2],
-            "password_hash": row[3],
-        }
-    return dict(row)
+def _row_to_dict(cur, row) -> dict[str, Any]:
+    """Convert a DB row to a dict using cursor.description - works for both psycopg2 and sqlite3."""
+    return dict(zip([d[0] for d in cur.description], row))
 
 
 class AuthDB:
@@ -176,7 +170,7 @@ class AuthDB:
                 (username,),
             )
             row = cur.fetchone()
-            return dict(row) if row else None
+            return _row_to_dict(cur, row) if row else None
 
     def get_user_by_email(self, email: str) -> dict[str, Any] | None:
         sq = _SQL_SQ_GET_BY_EMAIL_DN if self.has_display_name else _SQL_SQ_GET_BY_EMAIL
@@ -185,7 +179,7 @@ class AuthDB:
             cur = conn.cursor()
             cur.execute(self._p(pg, sq), (email,))
             row = cur.fetchone()
-            return dict(row) if row else None
+            return _row_to_dict(cur, row) if row else None
 
     def username_exists(self, username: str) -> bool:
         with self._get() as conn:
@@ -237,7 +231,7 @@ class AuthDB:
             row = cur.fetchone()
             if not row:
                 return False, "User not found"
-            stored_hash = row[0] if self._pg else row["password_hash"]
+            stored_hash = _row_to_dict(cur, row)["password_hash"]
             if not verify_password(current_password, stored_hash):
                 return False, "Current password is incorrect"
             new_hash = hash_password(new_password)

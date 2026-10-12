@@ -84,7 +84,7 @@ class TestHashAndVerify:
 
 class TestAuthDB:
     def test_create_and_authenticate(self, auth_db):
-        uid = auth_db.create_user("alice", "alice@example.com", "secret99")
+        uid = auth_db.create_user("alice@example.com", "secret99", username="alice")
         assert uid is not None
         user = auth_db.authenticate("alice", "secret99")
         assert user is not None
@@ -92,28 +92,28 @@ class TestAuthDB:
         assert "password_hash" not in user
 
     def test_authenticate_wrong_password(self, auth_db):
-        auth_db.create_user("bob", "bob@example.com", "rightpass")
+        auth_db.create_user("bob@example.com", "rightpass", username="bob")
         assert auth_db.authenticate("bob", "wrongpass") is None
 
     def test_username_exists(self, auth_db):
-        auth_db.create_user("carol", "carol@example.com", "pass123")
+        auth_db.create_user("carol@example.com", "pass123", username="carol")
         assert auth_db.username_exists("carol")
         assert not auth_db.username_exists("nobody")
 
     def test_email_exists(self, auth_db):
-        auth_db.create_user("dave", "dave@example.com", "pass123")
+        auth_db.create_user("dave@example.com", "pass123", username="dave")
         assert auth_db.email_exists("dave@example.com")
         assert not auth_db.email_exists("other@example.com")
 
     def test_change_password(self, auth_db):
-        uid = auth_db.create_user("eve", "eve@example.com", "oldpass1")
+        uid = auth_db.create_user("eve@example.com", "oldpass1", username="eve")
         ok, err = auth_db.change_password(uid, "oldpass1", "newpass1")
         assert ok
         assert auth_db.authenticate("eve", "newpass1") is not None
         assert auth_db.authenticate("eve", "oldpass1") is None
 
     def test_change_password_wrong_current(self, auth_db):
-        uid = auth_db.create_user("frank", "frank@example.com", "pass123")
+        uid = auth_db.create_user("frank@example.com", "pass123", username="frank")
         ok, err = auth_db.change_password(uid, "wrongcurrent", "newpass1")
         assert not ok
         assert "incorrect" in err.lower()
@@ -126,54 +126,54 @@ class TestAuthDB:
 
 class TestHandlers:
     def test_register_valid(self, auth_db):
-        ok, err = handlers.register(auth_db, "grace", "grace@example.com", "pass123")
+        ok, err = handlers.register(auth_db, "grace@example.com", "pass123", username="grace")
         assert ok
         assert err is None
 
     def test_register_short_username(self, auth_db):
-        ok, err = handlers.register(auth_db, "ab", "ab@example.com", "pass123")
+        ok, err = handlers.register(auth_db, "ab@example.com", "pass123", username="ab")
         assert not ok
         assert "Username" in err
 
     def test_register_invalid_email(self, auth_db):
-        ok, err = handlers.register(auth_db, "henry", "notanemail", "pass123")
+        ok, err = handlers.register(auth_db, "notanemail", "pass123", username="henry")
         assert not ok
         assert "email" in err.lower()
 
     def test_register_short_password(self, auth_db):
-        ok, err = handlers.register(auth_db, "ivan", "ivan@example.com", "12345")
+        ok, err = handlers.register(auth_db, "ivan@example.com", "12345", username="ivan")
         assert not ok
         assert "Password" in err
 
     def test_register_duplicate_username(self, auth_db):
-        handlers.register(auth_db, "judy", "judy@example.com", "pass123")
-        ok, err = handlers.register(auth_db, "judy", "other@example.com", "pass123")
+        handlers.register(auth_db, "judy@example.com", "pass123", username="judy")
+        ok, err = handlers.register(auth_db, "other@example.com", "pass123", username="judy")
         assert not ok
         assert "taken" in err.lower()
 
     def test_register_invite_code_required(self, auth_db):
         ok, err = handlers.register(
-            auth_db, "kent", "kent@example.com", "pass123",
+            auth_db, "kent@example.com", "pass123", username="kent",
             invite_code="", required_invite_code="secret"
         )
         assert not ok
 
     def test_register_invite_code_wrong(self, auth_db):
         ok, err = handlers.register(
-            auth_db, "kent", "kent@example.com", "pass123",
+            auth_db, "kent@example.com", "pass123", username="kent",
             invite_code="wrong", required_invite_code="secret"
         )
         assert not ok
 
     def test_register_invite_code_correct(self, auth_db):
         ok, err = handlers.register(
-            auth_db, "kent", "kent@example.com", "pass123",
+            auth_db, "kent@example.com", "pass123", username="kent",
             invite_code="secret", required_invite_code="secret"
         )
         assert ok
 
     def test_change_password_mismatch(self, auth_db):
-        uid = auth_db.create_user("lena", "lena@example.com", "pass123")
+        uid = auth_db.create_user("lena@example.com", "pass123", username="lena")
         ok, err = handlers.change_password(auth_db, uid, "pass123", "newpass1", "newpass2")
         assert not ok
         assert "match" in err.lower()
@@ -186,7 +186,7 @@ class TestHandlers:
 
 class TestBlueprint:
     def test_login_success(self, auth_db, client):
-        auth_db.create_user("mary", "mary@example.com", "pass123")
+        auth_db.create_user("mary@example.com", "pass123", username="mary")
         r = client.post("/api/login", json={"username": "mary", "password": "pass123"})
         assert r.status_code == 200
         assert r.get_json()["success"] is True
@@ -214,7 +214,7 @@ class TestBlueprint:
         assert r.status_code == 401
 
     def test_change_password_logged_in(self, auth_db, client):
-        auth_db.create_user("nick", "nick@example.com", "oldpass1")
+        auth_db.create_user("nick@example.com", "oldpass1", username="nick")
         client.post("/api/login", json={"username": "nick", "password": "oldpass1"})
         r = client.post("/api/user/change-password", json={
             "current_password": "oldpass1",
@@ -272,7 +272,7 @@ class TestResetPasswordRoutes:
         import fiat_lux_agents.auth.email as mailer
         sent = []
         monkeypatch.setattr(mailer, "send", lambda *a, **kw: sent.append(a))
-        auth_db.create_user("olivia", "olivia@example.com", "pass123")
+        auth_db.create_user("olivia@example.com", "pass123", username="olivia")
         r = client.post("/api/forgot-password", json={"email": "olivia@example.com"})
         assert r.status_code == 200
         assert len(sent) == 1
@@ -280,7 +280,7 @@ class TestResetPasswordRoutes:
 
     def test_reset_password_valid_token(self, auth_db, client):
         from fiat_lux_agents.auth.tokens import generate_reset_token
-        uid = auth_db.create_user("pete", "pete@example.com", "oldpass1")
+        uid = auth_db.create_user("pete@example.com", "oldpass1", username="pete")
         token = generate_reset_token(uid, _SECRET)
         r = client.post("/api/reset-password", json={
             "token": token,
@@ -303,7 +303,7 @@ class TestResetPasswordRoutes:
 
     def test_reset_password_mismatch(self, auth_db, client):
         from fiat_lux_agents.auth.tokens import generate_reset_token
-        uid = auth_db.create_user("quinn", "quinn@example.com", "pass123")
+        uid = auth_db.create_user("quinn@example.com", "pass123", username="quinn")
         token = generate_reset_token(uid, _SECRET)
         r = client.post("/api/reset-password", json={
             "token": token,
