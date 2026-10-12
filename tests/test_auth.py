@@ -64,6 +64,10 @@ def pg_db_factory():
     In CI this is provided by the postgres service container.
     Locally, skip if the env var is absent so developers can run tests
     without Docker.
+
+    Isolation: all writes within a test share one open transaction.
+    The fixture rolls the whole transaction back after each test so
+    tests never see each other's data.
     """
     db_url = os.environ.get("DATABASE_URL")
     if not db_url:
@@ -82,14 +86,17 @@ def pg_db_factory():
 
     @contextlib.contextmanager
     def get_connection():
+        # Yield the same connection every time so all operations within
+        # a test share one transaction. Do NOT commit or rollback here -
+        # the fixture teardown rolls back the whole test at once.
         yield conn
-        conn.rollback()  # roll back each test so state doesn't bleed
 
     yield get_connection
 
-    # Drop the table so a re-run starts clean
+    # Roll back all writes from this test, then clean up the table.
+    conn.rollback()
     with conn.cursor() as cur:
-        cur.execute("DROP TABLE IF EXISTS users")
+        cur.execute("TRUNCATE users RESTART IDENTITY")
     conn.commit()
     conn.close()
 
