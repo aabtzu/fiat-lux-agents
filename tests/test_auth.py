@@ -102,16 +102,28 @@ def pg_db_factory():
 
 
 # ---------------------------------------------------------------------------
-# Parametrized auth_db: runs every TestAuthDB test against both backends
+# auth_db fixtures
+#
+# dual_auth_db: parametrized [sqlite, postgres] - used by TestAuthDB and
+#   TestHandlers to verify raw DB behaviour on both backends.
+#
+# auth_db: SQLite only - used by TestBlueprint and TestResetPasswordRoutes
+#   where the Flask test client also uses SQLite; both must share the same DB.
 # ---------------------------------------------------------------------------
 
 @pytest.fixture(params=["sqlite", "postgres"])
-def auth_db(request):
+def dual_auth_db(request):
     if request.param == "sqlite":
         factory = request.getfixturevalue("mem_db_factory")
         return AuthDB(factory, use_postgres=False)
     factory = request.getfixturevalue("pg_db_factory")
     return AuthDB(factory, use_postgres=True)
+
+
+@pytest.fixture
+def auth_db(mem_db_factory):
+    """SQLite-only AuthDB, shared with the Flask test client fixtures."""
+    return AuthDB(mem_db_factory, use_postgres=False)
 
 
 _SECRET = "test-secret"
@@ -150,38 +162,38 @@ class TestHashAndVerify:
 
 
 class TestAuthDB:
-    def test_create_and_authenticate(self, auth_db):
-        uid = auth_db.create_user("alice@example.com", "secret99", username="alice")
+    def test_create_and_authenticate(self, dual_auth_db):
+        uid = dual_auth_db.create_user("alice@example.com", "secret99", username="alice")
         assert uid is not None
-        user = auth_db.authenticate("alice", "secret99")
+        user = dual_auth_db.authenticate("alice", "secret99")
         assert user is not None
         assert user["username"] == "alice"
         assert "password_hash" not in user
 
-    def test_authenticate_wrong_password(self, auth_db):
-        auth_db.create_user("bob@example.com", "rightpass", username="bob")
-        assert auth_db.authenticate("bob", "wrongpass") is None
+    def test_authenticate_wrong_password(self, dual_auth_db):
+        dual_auth_db.create_user("bob@example.com", "rightpass", username="bob")
+        assert dual_auth_db.authenticate("bob", "wrongpass") is None
 
-    def test_username_exists(self, auth_db):
-        auth_db.create_user("carol@example.com", "pass123", username="carol")
-        assert auth_db.username_exists("carol")
-        assert not auth_db.username_exists("nobody")
+    def test_username_exists(self, dual_auth_db):
+        dual_auth_db.create_user("carol@example.com", "pass123", username="carol")
+        assert dual_auth_db.username_exists("carol")
+        assert not dual_auth_db.username_exists("nobody")
 
-    def test_email_exists(self, auth_db):
-        auth_db.create_user("dave@example.com", "pass123", username="dave")
-        assert auth_db.email_exists("dave@example.com")
-        assert not auth_db.email_exists("other@example.com")
+    def test_email_exists(self, dual_auth_db):
+        dual_auth_db.create_user("dave@example.com", "pass123", username="dave")
+        assert dual_auth_db.email_exists("dave@example.com")
+        assert not dual_auth_db.email_exists("other@example.com")
 
-    def test_change_password(self, auth_db):
-        uid = auth_db.create_user("eve@example.com", "oldpass1", username="eve")
-        ok, err = auth_db.change_password(uid, "oldpass1", "newpass1")
+    def test_change_password(self, dual_auth_db):
+        uid = dual_auth_db.create_user("eve@example.com", "oldpass1", username="eve")
+        ok, err = dual_auth_db.change_password(uid, "oldpass1", "newpass1")
         assert ok
-        assert auth_db.authenticate("eve", "newpass1") is not None
-        assert auth_db.authenticate("eve", "oldpass1") is None
+        assert dual_auth_db.authenticate("eve", "newpass1") is not None
+        assert dual_auth_db.authenticate("eve", "oldpass1") is None
 
-    def test_change_password_wrong_current(self, auth_db):
-        uid = auth_db.create_user("frank@example.com", "pass123", username="frank")
-        ok, err = auth_db.change_password(uid, "wrongcurrent", "newpass1")
+    def test_change_password_wrong_current(self, dual_auth_db):
+        uid = dual_auth_db.create_user("frank@example.com", "pass123", username="frank")
+        ok, err = dual_auth_db.change_password(uid, "wrongcurrent", "newpass1")
         assert not ok
         assert "incorrect" in err.lower()
 
@@ -192,56 +204,56 @@ class TestAuthDB:
 
 
 class TestHandlers:
-    def test_register_valid(self, auth_db):
-        ok, err = handlers.register(auth_db, "grace@example.com", "pass123", username="grace")
+    def test_register_valid(self, dual_auth_db):
+        ok, err = handlers.register(dual_auth_db, "grace@example.com", "pass123", username="grace")
         assert ok
         assert err is None
 
-    def test_register_short_username(self, auth_db):
-        ok, err = handlers.register(auth_db, "ab@example.com", "pass123", username="ab")
+    def test_register_short_username(self, dual_auth_db):
+        ok, err = handlers.register(dual_auth_db, "ab@example.com", "pass123", username="ab")
         assert not ok
         assert "Username" in err
 
-    def test_register_invalid_email(self, auth_db):
-        ok, err = handlers.register(auth_db, "notanemail", "pass123", username="henry")
+    def test_register_invalid_email(self, dual_auth_db):
+        ok, err = handlers.register(dual_auth_db, "notanemail", "pass123", username="henry")
         assert not ok
         assert "email" in err.lower()
 
-    def test_register_short_password(self, auth_db):
-        ok, err = handlers.register(auth_db, "ivan@example.com", "12345", username="ivan")
+    def test_register_short_password(self, dual_auth_db):
+        ok, err = handlers.register(dual_auth_db, "ivan@example.com", "12345", username="ivan")
         assert not ok
         assert "Password" in err
 
-    def test_register_duplicate_username(self, auth_db):
-        handlers.register(auth_db, "judy@example.com", "pass123", username="judy")
-        ok, err = handlers.register(auth_db, "other@example.com", "pass123", username="judy")
+    def test_register_duplicate_username(self, dual_auth_db):
+        handlers.register(dual_auth_db, "judy@example.com", "pass123", username="judy")
+        ok, err = handlers.register(dual_auth_db, "other@example.com", "pass123", username="judy")
         assert not ok
         assert "taken" in err.lower()
 
-    def test_register_invite_code_required(self, auth_db):
+    def test_register_invite_code_required(self, dual_auth_db):
         ok, err = handlers.register(
-            auth_db, "kent@example.com", "pass123", username="kent",
+            dual_auth_db, "kent@example.com", "pass123", username="kent",
             invite_code="", required_invite_code="secret"
         )
         assert not ok
 
-    def test_register_invite_code_wrong(self, auth_db):
+    def test_register_invite_code_wrong(self, dual_auth_db):
         ok, err = handlers.register(
-            auth_db, "kent@example.com", "pass123", username="kent",
+            dual_auth_db, "kent@example.com", "pass123", username="kent",
             invite_code="wrong", required_invite_code="secret"
         )
         assert not ok
 
-    def test_register_invite_code_correct(self, auth_db):
+    def test_register_invite_code_correct(self, dual_auth_db):
         ok, err = handlers.register(
-            auth_db, "kent@example.com", "pass123", username="kent",
+            dual_auth_db, "kent@example.com", "pass123", username="kent",
             invite_code="secret", required_invite_code="secret"
         )
         assert ok
 
-    def test_change_password_mismatch(self, auth_db):
-        uid = auth_db.create_user("lena@example.com", "pass123", username="lena")
-        ok, err = handlers.change_password(auth_db, uid, "pass123", "newpass1", "newpass2")
+    def test_change_password_mismatch(self, dual_auth_db):
+        uid = dual_auth_db.create_user("lena@example.com", "pass123", username="lena")
+        ok, err = handlers.change_password(dual_auth_db, uid, "pass123", "newpass1", "newpass2")
         assert not ok
         assert "match" in err.lower()
 
