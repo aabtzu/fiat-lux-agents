@@ -81,6 +81,17 @@ _SQL_SQ_EMAIL_EXISTS = "SELECT 1 FROM users WHERE email = ?"
 _SQL_PG_SET_PASSWORD = "UPDATE users SET password_hash = %s WHERE id = %s"
 _SQL_SQ_SET_PASSWORD = "UPDATE users SET password_hash = ? WHERE id = ?"
 
+_SQL_PG_GET_BY_ID = "SELECT id, username, email FROM users WHERE id = %s"
+_SQL_SQ_GET_BY_ID = "SELECT id, username, email FROM users WHERE id = ?"
+
+# Used for Google OAuth: create a user without a password (NULL password_hash).
+_SQL_PG_INSERT_GOOGLE_USER = (
+    "INSERT INTO users (username, email, password_hash) VALUES (%s, %s, NULL) RETURNING id"
+)
+_SQL_SQ_INSERT_GOOGLE_USER = (
+    "INSERT INTO users (username, email, password_hash) VALUES (?, ?, NULL)"
+)
+
 
 def hash_password(password: str) -> str:
     return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
@@ -251,3 +262,44 @@ class AuthDB:
                 (new_hash, user_id),
             )
             return cur.rowcount > 0
+
+    def get_user_by_id(self, user_id: int) -> dict[str, Any] | None:
+        with self._get() as conn:
+            cur = conn.cursor()
+            cur.execute(self._p(_SQL_PG_GET_BY_ID, _SQL_SQ_GET_BY_ID), (user_id,))
+            row = cur.fetchone()
+            return _row_to_dict(cur, row) if row else None
+
+    def get_or_create_google_user(self, email: str, name: str) -> dict[str, Any] | None:
+        """Look up a user by email; create one (no password) if not found.
+
+        Used for Google OAuth auto-linking: if the email already exists we
+        log them in regardless of how they registered. Returns a user dict
+        with at least {id, username, email}, or None on DB error.
+        """
+        email = email.strip().lower()
+        existing = self.get_user_by_email(email)
+        if existing:
+            return {"id": existing["id"], "username": existing.get("username", ""), "email": email}
+
+        # Derive a username from the name or email prefix, then make it unique.
+        base = (name or email.split("@")[0]).lower().replace(" ", "")
+        username = base
+        suffix = 1
+        while self.username_exists(username):
+            username = f"{base}{suffix}"
+            suffix += 1
+
+        with self._get() as conn:
+            cur = conn.cursor()
+            try:
+                if self._pg:
+                    cur.execute(_SQL_PG_INSERT_GOOGLE_USER, (username, email))
+                    user_id = cur.fetchone()[0]
+                else:
+                    cur.execute(_SQL_SQ_INSERT_GOOGLE_USER, (username, email))
+                    user_id = cur.lastrowid
+                return {"id": user_id, "username": username, "email": email}
+            except Exception as e:
+                print(f"[fla-auth] get_or_create_google_user failed: {e}")
+                return None

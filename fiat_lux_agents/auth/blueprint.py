@@ -24,10 +24,12 @@ Email-based usage (fiat-lux style):
 
 from __future__ import annotations
 
+import os
+import secrets
 from datetime import UTC, datetime
 from typing import Callable
 
-from flask import Blueprint, jsonify, request, session
+from flask import Blueprint, jsonify, redirect, request, session
 
 from .db import AuthDB
 from . import handlers
@@ -45,6 +47,8 @@ def make_auth_blueprint(
     app_name: str = "Libertas",
     url_prefix: str = "/api",
     blueprint_name: str = "fla_auth",
+    google_client_id: str = "",
+    google_client_secret: str = "",
 ) -> Blueprint:
     """Return a configured auth blueprint.
 
@@ -161,5 +165,94 @@ def make_auth_blueprint(
         if success:
             return _ok({})
         return _err(error)
+
+    # Google OAuth routes - only registered when client credentials are provided.
+    if google_client_id and google_client_secret:
+        _GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
+        _GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
+        _GOOGLE_USERINFO_URL = "https://www.googleapis.com/oauth2/v3/userinfo"
+        _GOOGLE_SCOPES = "openid email profile"
+
+        @bp.get("/auth/google")
+        def google_login():
+            import urllib.parse
+
+            state = secrets.token_urlsafe(16)
+            session["oauth_state"] = state
+            redirect_uri = f"{app_url.rstrip('/')}/auth/google/callback"
+            params = {
+                "client_id": google_client_id,
+                "redirect_uri": redirect_uri,
+                "response_type": "code",
+                "scope": _GOOGLE_SCOPES,
+                "state": state,
+                "access_type": "online",
+            }
+            return redirect(f"{_GOOGLE_AUTH_URL}?{urllib.parse.urlencode(params)}")
+
+        @bp.get("/auth/google/callback")
+        def google_callback():
+            import urllib.parse
+
+            import requests as http
+
+            error = request.args.get("error")
+            if error:
+                return redirect(f"{app_url.rstrip('/')}/login.html?error=google_denied")
+
+            state = request.args.get("state", "")
+            if not state or state != session.pop("oauth_state", None):
+                return redirect(f"{app_url.rstrip('/')}/login.html?error=google_state")
+
+            code = request.args.get("code", "")
+            redirect_uri = f"{app_url.rstrip('/')}/auth/google/callback"
+
+            # Exchange code for tokens.
+            token_resp = http.post(
+                _GOOGLE_TOKEN_URL,
+                data={
+                    "code": code,
+                    "client_id": google_client_id,
+                    "client_secret": google_client_secret,
+                    "redirect_uri": redirect_uri,
+                    "grant_type": "authorization_code",
+                },
+                timeout=10,
+            )
+            if not token_resp.ok:
+                return redirect(f"{app_url.rstrip('/')}/login.html?error=google_token")
+
+            access_token = token_resp.json().get("access_token", "")
+            if not access_token:
+                return redirect(f"{app_url.rstrip('/')}/login.html?error=google_token")
+
+            # Fetch the user's profile from Google.
+            userinfo_resp = http.get(
+                _GOOGLE_USERINFO_URL,
+                headers={"Authorization": f"Bearer {access_token}"},
+                timeout=10,
+            )
+            if not userinfo_resp.ok:
+                return redirect(f"{app_url.rstrip('/')}/login.html?error=google_userinfo")
+
+            info = userinfo_resp.json()
+            email = (info.get("email") or "").strip().lower()
+            name = info.get("name") or info.get("given_name") or ""
+
+            if not email:
+                return redirect(f"{app_url.rstrip('/')}/login.html?error=google_no_email")
+
+            user = db.get_or_create_google_user(email, name)
+            if not user:
+                return redirect(f"{app_url.rstrip('/')}/login.html?error=google_db")
+
+            session.permanent = True
+            session["user_id"] = user["id"]
+            session["username"] = user.get("username", "")
+
+            ts = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+            print(f"[fla-auth][GOOGLE] {email} (user {user['id']}) @ {ts}", flush=True)
+
+            return redirect(f"{app_url.rstrip('/')}/trips.html")
 
     return bp
