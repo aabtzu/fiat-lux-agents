@@ -59,6 +59,23 @@ def _check_imports() -> None:
         ) from e
 
 
+def _extract_pdf_text(raw: bytes) -> str:
+    """Extract plain text from PDF bytes using pypdf."""
+    try:
+        import io
+
+        from pypdf import PdfReader
+
+        reader = PdfReader(io.BytesIO(raw))
+        pages = [page.extract_text() or "" for page in reader.pages]
+        text = "\n\n".join(p for p in pages if p.strip())
+        if not text.strip():
+            raise ValueError("Could not extract text from this PDF — it may be scanned or image-only.")
+        return text
+    except ImportError as e:
+        raise ImportError("PDF extraction requires pypdf: pip install pypdf") from e
+
+
 def is_safe_url(url: str) -> tuple[bool, str]:
     """Return (safe, reason). Resolves hostname to block private/loopback IPs."""
     parsed = urlparse(url)
@@ -188,6 +205,10 @@ def _fetch_webpage(url: str, requests, trafilatura) -> dict:
             "title": _title_from_url(url),
             "source_type": "text",
         }
+
+    if "application/pdf" in content_type or url.lower().split("?")[0].endswith(".pdf"):
+        text = _extract_pdf_text(raw)
+        return {"text": text, "title": _title_from_url(url), "source_type": "pdf"}
 
     html = raw.decode("utf-8", errors="replace")
     text = trafilatura.extract(

@@ -25,6 +25,7 @@ mcp = [
 auth = [
     "flask>=3.0.0",
     "bcrypt>=4.0.0",
+    "requests>=2.32.0",
 ]
 web = [
     "requests>=2.32.0",

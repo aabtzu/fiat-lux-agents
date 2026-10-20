@@ -46,6 +46,93 @@ Include all transactions. Skip running balances, summary rows, totals, and non-t
 Return only a valid JSON array — no prose, no markdown fences."""
 
 
+_KNOWN_MERCHANTS: frozenset[str] = frozenset({
+    # Streaming & subscriptions
+    "netflix", "hulu", "spotify", "amazon music", "apple tv", "disney", "disney plus",
+    "peacock", "paramount", "hbo", "sling", "fubo", "youtube", "tidal", "pandora",
+    "adobe", "microsoft", "dropbox", "github", "anthropic", "openai", "notion",
+    "slack", "cursor", "dakboard", "concur", "medium", "splitwise", "linkedin",
+    # Shopping
+    "amazon", "amazon.com", "target", "walmart", "ikea", "costco",
+    "barnes & noble", "dick's", "rei",
+    # Groceries
+    "whole foods", "trader joe", "stop & shop", "fairway", "shoprite", "wegmans",
+    "key food", "bj's", "fresh market",
+    # Dining chains
+    "starbucks", "dunkin", "mcdonald", "chipotle", "taco bell", "burger king",
+    "subway", "domino", "pizza hut", "panera", "shake shack", "sweetgreen",
+    "doordash", "grubhub", "uber eats", "seamless",
+    # Travel
+    "delta", "united", "american airlines", "southwest", "jetblue", "amtrak",
+    "marriott", "hilton", "hyatt", "ihg", "crowne plaza", "airbnb", "expedia",
+    "booking.com", "hertz", "avis", "enterprise", "uber", "lyft",
+    # Gas
+    "shell", "mobil", "bp", "exxon", "sunoco", "chevron", "gulf",
+    "cumberland farms", "wawa", "sheetz", "speedway",
+    # Healthcare / pharmacy
+    "cvs", "walgreens", "rite aid", "duane reade",
+    "lenscrafters",
+    # Home
+    "home depot", "lowe's", "lowe", "ikea",
+    # Utilities / telecom
+    "verizon", "at&t", "t-mobile", "comcast", "spectrum", "google fi",
+    "con ed", "con edison", "national grid", "vermont gas",
+    # Fitness
+    "equinox", "soulcycle", "peloton", "planet fitness", "ymca", "24 hour fitness",
+    "ashley wang", "ashley wangs",
+    # Financial / payment
+    "chase", "citi", "amex", "bank of america", "wells fargo", "fidelity",
+    "venmo", "paypal", "zelle",
+    # Known specifics from this user's data
+    "garagiste",
+    "apple", "google",
+})
+
+_CITY_STATE_RE = re.compile(r"\s+-\s+[A-Z][A-Za-z\s]+(?:[A-Z]{2})?\s*$")
+_CODE_ASTERISK_RE = re.compile(r"^[A-Z0-9]{2,8}\*", re.I)
+
+# POS prefixes where the merchant after is unknown → uncertain (0.6)
+_AMBIGUOUS_POS = ("sq *", "sp ", "gf*", "aplpay ", "gglpay ", "aple*")
+# POS prefixes that always imply a known category regardless of merchant name
+_CONFIDENT_POS = ("tst*",)  # TST = Toast = always Dining
+
+
+def _is_known(desc: str) -> bool:
+    dl = desc.lower()
+    return any(m in dl for m in _KNOWN_MERCHANTS)
+
+
+def _compute_confidence(description: str) -> float:
+    """Deterministic confidence heuristic — takes minimum with Haiku's self-reported score."""
+    desc = _CITY_STATE_RE.sub("", description).strip()
+
+    # TST* and similar always imply a known category
+    for prefix in _CONFIDENT_POS:
+        if desc.lower().startswith(prefix):
+            return 1.0
+
+    # Ambiguous POS prefix + unknown merchant → uncertain
+    for prefix in _AMBIGUOUS_POS:
+        if desc.lower().startswith(prefix):
+            after = desc[len(prefix):].strip()
+            return 0.6 if not _is_known(after) else 1.0
+
+    if _is_known(desc):
+        return 1.0
+
+    merchant = desc.split(" - ")[0].strip()
+
+    # Single-word unknown merchant
+    if " " not in merchant and not _is_known(merchant):
+        return 0.6
+
+    # Code-like pattern: "PERK*", "XYZ123*"
+    if _CODE_ASTERISK_RE.match(merchant):
+        return 0.6
+
+    return 0.9
+
+
 def _extract_cat_conf(item) -> tuple[str, float]:
     """Extract (category, confidence) from a Haiku response item.
 
@@ -104,7 +191,8 @@ Software, SaaS, developer tools, productivity apps: Adobe, Microsoft 365, Dropbo
 NOT Streaming services (those go above).
 
 ### Fitness
-Gyms and fitness studios: SoulCycle, Equinox, Planet Fitness, CrossFit, Peloton, Snap Fitness, LA Fitness, 24 Hour Fitness, YMCA.
+Gyms and fitness studios: SoulCycle, Equinox, Planet Fitness, CrossFit, Peloton, Snap Fitness, LA Fitness, 24 Hour Fitness, YMCA, Ashley Wang (fitness/yoga studio).
+"ASHLEY WANG" or "ASHLEY WANGS" → Fitness (fitness/yoga studio, regardless of what follows).
 Sports equipment stores (Pure Hockey, REI, Dick's Sporting Goods) → Shopping, NOT Fitness.
 
 ### Shopping
@@ -118,9 +206,10 @@ Gas stations AND convenience stores with gas: Shell, Mobil, BP, Sunoco, Exxon, C
 E-ZPass, tolls, EZPass → Gas & Fuel.
 
 ### Auto
-Auto repair shops, mechanics, car washes, automotive parts: Jiffy Lube, Midas, AutoZone, O'Reilly, Garagiste.
+Auto repair shops, mechanics, car washes, automotive parts: Jiffy Lube, Midas, AutoZone, O'Reilly.
 Car loan payments → Auto.
 DMV fees, vehicle registration → Fees & Interest (government fee, NOT Auto).
+"GARAGISTE" → Shopping (it is a wine distributor/club, NOT an auto shop despite the name).
 
 ### Healthcare
 Doctors, dentists, hospitals, pharmacies, opticians: CVS Pharmacy, Walgreens, LensCrafters (optical/eyewear), vision centers, dental offices.
@@ -153,11 +242,17 @@ Credit card payments, loan payments, Amex autopay, Chase autopay. Outgoing Venmo
 
 ## Confidence scoring
 Assign a confidence score (0.0–1.0) reflecting how certain you are of the category:
-- 0.9–1.0: Clear match — well-known merchant, explicit pattern (TST*, APPLE.COM/BILL, airline name)
-- 0.7–0.89: Reasonable guess — familiar merchant type, partial pattern match
-- 0.5–0.69: Ambiguous — unfamiliar merchant name, could fit multiple categories
-- 0.3–0.49: Very uncertain — generic or cryptic description, no recognizable pattern
-Use confidence < 0.7 when: merchant name is a single word or abbreviation with no context, the name sounds like one thing but could be another (e.g. "Garagiste" sounds like auto but is wine), or the transaction is from a foreign city with unfamiliar merchants.
+- 0.9–1.0: Clear match — merchant explicitly named in the rules above (TST*, APPLE.COM/BILL, Delta, Whole Foods, etc.)
+- 0.8–0.89: Confident — merchant type is obvious even if not explicitly listed (e.g. "BODEGA" → Groceries)
+- 0.6–0.79: Uncertain — unfamiliar merchant name, single-word name with no context, or name that could fit 2+ categories
+- 0.3–0.59: Very uncertain — cryptic abbreviation, unknown company name (LLC/INC with no obvious business type), or foreign merchant in an unfamiliar city
+
+YOU MUST use confidence ≤ 0.75 when ANY of these apply:
+- The merchant name is a single word you don't recognize (e.g. "SNAPPY", "PERK*")
+- The name is "SP ", "SQ ", "GF*" followed by an unfamiliar company name
+- The description contains only a phone number or reference code with no recognizable merchant
+- The merchant is in a foreign country and you're unsure of the business type
+- The name sounds like one category but could be another (Garagiste, Fourtitude, etc.)
 
 Input: a JSON array of {{"description": str, "txn_type": "debit"|"credit"}} objects.
 Return: a JSON array of {{"category": str, "confidence": float}} objects — same length, same order, nothing else.
@@ -441,17 +536,21 @@ class StatementParser(LLMBase):
         prompt = _build_normalize_prompt(taxonomy)
         items = [{"description": r["description"], "txn_type": r.get("txn_type", "debit")} for r in rows]
 
+        def _call(batch_items: list[dict]) -> str:
+            r = self.client.messages.create(
+                model=self.category_model,
+                max_tokens=4096,
+                messages=[{"role": "user", "content": f"{prompt}\n\n{json.dumps(batch_items)}"}],
+            )
+            print(f"[StatementParser] Haiku stop={r.stop_reason!r}")
+            return r.content[0].text.strip()
+
         t0 = time.time()
         print(f"[StatementParser] Normalizing {len(rows)} rows with {self.category_model}...")
         try:
-            resp = self.client.messages.create(
-                model=self.category_model,
-                max_tokens=4096,
-                messages=[{"role": "user", "content": f"{prompt}\n\n{json.dumps(items)}"}],
-            )
+            raw_text = _call(items)
             elapsed = time.time() - t0
-            raw_text = resp.content[0].text.strip()
-            print(f"[StatementParser] Haiku responded in {elapsed:.1f}s, stop_reason={resp.stop_reason!r}")
+            print(f"[StatementParser] Haiku responded in {elapsed:.1f}s")
 
             if raw_text.startswith("```"):
                 raw_text = re.sub(r"```[^\n]*\n?", "", raw_text).strip()
@@ -463,19 +562,15 @@ class StatementParser(LLMBase):
                     cat, conf = _extract_cat_conf(item)
                     if cat:
                         row["category"] = cat
-                        row["confidence"] = conf
+                        # Take the more pessimistic of Haiku's score and our deterministic check
+                        row["confidence"] = min(conf, _compute_confidence(row["description"]))
                         applied += 1
                 print(f"[StatementParser] Categories applied to {applied}/{len(rows)} rows.")
                 if len(normalized) < len(rows):
                     missed = rows[len(normalized):]
                     print(f"[StatementParser] {len(missed)} rows uncategorized — retrying")
                     retry_items = [{"description": r["description"], "txn_type": r.get("txn_type", "debit")} for r in missed]
-                    retry_resp = self.client.messages.create(
-                        model=self.category_model,
-                        max_tokens=4096,
-                        messages=[{"role": "user", "content": f"{prompt}\n\n{json.dumps(retry_items)}"}],
-                    )
-                    retry_text = retry_resp.content[0].text.strip()
+                    retry_text = _call(retry_items)
                     if retry_text.startswith("```"):
                         retry_text = re.sub(r"```[^\n]*\n?", "", retry_text).strip()
                     retry_cats = json.loads(retry_text)
@@ -484,7 +579,7 @@ class StatementParser(LLMBase):
                             cat, conf = _extract_cat_conf(item)
                             if cat:
                                 row["category"] = cat
-                                row["confidence"] = conf
+                                row["confidence"] = min(conf, _compute_confidence(row["description"]))
                         print(f"[StatementParser] Retry categorized {min(len(retry_cats), len(missed))} missed rows.")
                 elif len(normalized) > len(rows):
                     print(f"[StatementParser] Got {len(normalized)} categories for {len(rows)} rows — used first {len(rows)}")
