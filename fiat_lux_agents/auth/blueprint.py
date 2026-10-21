@@ -49,6 +49,7 @@ def make_auth_blueprint(
     blueprint_name: str = "fla_auth",
     google_client_id: str = "",
     google_client_secret: str = "",
+    admin_email: str = "",
 ) -> Blueprint:
     """Return a configured auth blueprint.
 
@@ -64,9 +65,28 @@ def make_auth_blueprint(
         app_name:        app name shown in emails
         url_prefix:      prefix for all routes (default /api)
         blueprint_name:  Flask blueprint name (change if registering multiple times)
+        admin_email:     if set, receive an email notification on every new signup
     """
     db = AuthDB(get_connection, use_postgres, login_field=login_field, has_display_name=has_display_name)
     bp = Blueprint(blueprint_name, __name__, template_folder="templates")
+
+    def _notify_signup(identifier: str, method: str) -> None:
+        if not admin_email or not from_email:
+            return
+        from . import email as mailer
+
+        ts = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+        subject = f"[{app_name}] New signup: {identifier}"
+        body = (
+            f"<p>New user signed up on {app_name}.</p>"
+            f"<p><strong>Account:</strong> {identifier}<br>"
+            f"<strong>Method:</strong> {method}<br>"
+            f"<strong>Time:</strong> {ts}</p>"
+        )
+        try:
+            mailer.send(admin_email, subject, body, from_email)
+        except Exception as e:
+            print(f"[fla-auth] signup notify failed: {e}")
 
     def _ok(data: dict) -> tuple:
         return jsonify({"success": True, **data}), 200
@@ -108,6 +128,7 @@ def make_auth_blueprint(
             ts = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
             identifier = data.get(login_field, "").strip()
             print(f"[fla-auth][SIGNUP] {identifier} @ {ts}", flush=True)
+            _notify_signup(identifier, "email/password")
             return _ok({})
         return _err(error)
 
@@ -242,16 +263,18 @@ def make_auth_blueprint(
             if not email:
                 return redirect(f"{app_url.rstrip('/')}/login.html?error=google_no_email")
 
+            is_new = not db.email_exists(email)
             user = db.get_or_create_google_user(email, name)
             if not user:
                 return redirect(f"{app_url.rstrip('/')}/login.html?error=google_db")
-
             session.permanent = True
             session["user_id"] = user["id"]
             session["username"] = user.get("username", "")
 
             ts = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
             print(f"[fla-auth][GOOGLE] {email} (user {user['id']}) @ {ts}", flush=True)
+            if is_new:
+                _notify_signup(email, "Google")
 
             return redirect(f"{app_url.rstrip('/')}/trips.html")
 
